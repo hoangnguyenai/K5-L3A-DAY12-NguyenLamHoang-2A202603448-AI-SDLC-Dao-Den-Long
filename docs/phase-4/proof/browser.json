@@ -1,0 +1,33 @@
+{
+  "resolution": "1280x720",
+  "fps": 49.9,
+  "viewport": "1280x720",
+  "errors": [],
+  "settingsPersisted": true,
+  "pauseClockFrozen": true,
+  "restart": true,
+  "menu": true,
+  "pickupFeedback": true,
+  "partialDepositFeedback": true,
+  "emptyDepositFeedback": true,
+  "mapPreviews": [
+    2,
+    3
+  ],
+  "mapFps": [
+    {
+      "night": 2,
+      "fps": 38.54483320418827,
+      "lit": 5,
+      "mode": "Scene preview"
+    },
+    {
+      "night": 3,
+      "fps": 44.65264626731785,
+      "lit": 6,
+      "mode": "Scene preview"
+    }
+  ],
+  "date": "2026-11-20T09:43:10.998Z",
+  "note": "Chrome headless, FPS đo từ requestAnimationFrame trong cửa sổ 5 giây. Preview Đêm 2/3 dùng Scene riêng, không phải bằng chứng thắng chuỗi."
+}

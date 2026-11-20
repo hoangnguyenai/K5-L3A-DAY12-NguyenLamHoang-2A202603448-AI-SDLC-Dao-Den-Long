@@ -1,0 +1,26 @@
+name: Publish game
+on:
+  push:
+    tags: ['v1.0.0']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/verify.mjs
+      - name: Package local game server and built website
+        run: |
+          mkdir -p package/scripts
+          cp -r dist package/
+          cp scripts/{serve,board}.mjs package/scripts/
+          cp LICENSE CREDITS.md docs/phase-4/PLAY.md package/
+          (cd package && zip -qr ../dao-den-long-v1.0.0.zip .)
+      - name: Publish verified build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create v1.0.0 dao-den-long-v1.0.0.zip --verify-tag --title 'Đảo Đèn Lồng v1.0.0' --notes-file docs/phase-4/PLAY.md

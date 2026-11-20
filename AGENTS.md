@@ -2,6 +2,7 @@
 
 - Đọc yêu cầu của phase hiện tại. Ghi các giả định và tiêu chí nghiệm thu trước khi đổi luật chơi.
 - Đặt logic cố định 60 tick/giây trong `src/simulation.mjs`. Bản web và headless dùng chung mô phỏng và `game.contract.json`.
+- Phase 4 dùng Contract v1.3. Benchmark và soak dùng lệnh trong game.contract.json. Giữ nguyên số lượng thực thể, kích thước canvas và lưu kết quả máy đo kể cả khi dưới ngưỡng.
 - Phase 3 dùng Contract v1.2. Ticket-03 thay luật dầu, vùng an toàn, sức chứa, điểm và bình minh. Ticket-02 tiếp tục quy định các cơ chế còn lại. `src/maps.mjs` giữ hình học ba đảo. Thứ tự tick trong `src/simulation.mjs` phải theo ticket, kể cả khi pause, rơi và spawn.
 - Chạy `node scripts/verify.mjs` để build, kiểm thử hồi quy, scenario từng tính năng, kiểm tra tính tất định và đo 18.000 tick. Sửa lỗi và chạy lại nếu test đỏ. GitHub Actions chạy cùng lệnh trên Ubuntu và macOS.
 - Dùng `node scripts/serve.mjs` để xem bản web. Kiểm tra camera, HUD, điều khiển và vòng chơi lại khi đổi phần hiển thị.

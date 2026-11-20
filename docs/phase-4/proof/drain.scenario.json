@@ -1,0 +1,25 @@
+{
+  "random_motes": false,
+  "random_shades": false,
+  "random_drifters": false,
+  "wind_enabled": false,
+  "lanterns": [
+    {
+      "id": "L1",
+      "lit": true,
+      "fuel": 25
+    }
+  ],
+  "shades": [
+    {
+      "id": "S1",
+      "pos": [
+        0,
+        0.8,
+        25
+      ],
+      "state": "drain",
+      "target_lantern_id": "L1"
+    }
+  ]
+}

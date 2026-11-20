@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: extinction and relight in one tick, relight points and capacity cap
+ok 1 - extinction and relight in one tick, relight points and capacity cap
+  ---
+  duration_ms: 14.2023
+  type: 'test'
+  ...
+# Subtest: first light, capped refuel and full lamp eligibility
+ok 2 - first light, capped refuel and full lamp eligibility
+  ---
+  duration_ms: 1.1916
+  type: 'test'
+  ...
+# Subtest: stacked drain, pause and 60-tick event cadence
+ok 3 - stacked drain, pause and 60-tick event cadence
+  ---
+  duration_ms: 5.1478
+  type: 'test'
+  ...
+# Subtest: weak light attracts wander, draining shade chases and pulse earns 15
+ok 4 - weak light attracts wander, draining shade chases and pulse earns 15
+  ---
+  duration_ms: 3.1764
+  type: 'test'
+  ...
+# Subtest: refuel restores protection at exactly 30, suppressing contact
+ok 5 - refuel restores protection at exactly 30, suppressing contact
+  ---
+  duration_ms: 0.8471
+  type: 'test'
+  ...
+# Subtest: dawn uses final lamps, floors fuel and gives death priority on every island
+ok 6 - dawn uses final lamps, floors fuel and gives death priority on every island
+  ---
+  duration_ms: 3.9395
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 54.1735

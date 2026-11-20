@@ -1,6 +1,10 @@
 # Đảo Đèn Lồng
 
-**Phase 3 · Đèn cạn dầu · Test Contract v1.2**
+[Xem video demo](docs/demo/demo.mp4) · [Tải bản v1.0.0](https://github.com/hoangnguyenai/K5-L3A-DAY12-NguyenLamHoang-2A202603448-AI-SDLC-Dao-Den-Long/releases/tag/v1.0.0)
+
+**Bình minh · v1.0.0 · Test Contract v1.3**
+
+![Mây đi tìm đom đóm trên Đảo Bến](docs/phase-4/proof/night-1.png)
 
 Đưa Mây qua ba hòn đảo và giữ đủ đèn sáng tới bình minh. Đèn còn ít dầu sẽ nhấp nháy và thu hút Bóng Mực. Dùng Tỏa Sáng để ngắt hút dầu, hoặc châm thêm dầu để khôi phục vùng an toàn.
 
@@ -35,12 +39,32 @@ Cài đặt lưu âm lượng, độ nhạy chuột và tùy chọn “Bảng m�
 
 Mỗi đom đóm nạp được 5 điểm. Thắp lần đầu thưởng 100, thắp lại thưởng 40. Tỏa Sáng trúng Bóng Mực được 15 điểm nếu nó đang hút dầu, các trạng thái khác được 5. Khi thắng, mỗi đèn sáng thưởng 50 cộng phần nguyên lượng dầu, mỗi Ngọn Lửa còn lại thưởng 50. Tổng điểm chỉ tính các Đêm đã thắng.
 
+## Bảng điểm và trợ năng
+
+Sau một lần thua hoặc sau Bình Minh, nhập tên gồm 3–12 chữ cái ASCII, chữ số hoặc dấu gạch dưới rồi chọn **Lưu điểm**. Menu **Bảng xếp hạng** hiển thị 10 kết quả cao nhất, bằng điểm ưu tiên kết quả đạt sớm. Máy chủ cục bộ lưu vào `~/.dao-den-long/leaderboard.json`. Đặt `LANTERN_BOARD` để chọn đường dẫn khác. Chạy qua máy chủ đi kèm để các phiên chơi và lệnh xuất đọc cùng file.
+
+Trong **Cài đặt → Đổi phím điều khiển**, chọn hành động rồi nhấn phím mới. Cài đặt phát hiện phím trùng, hỗ trợ khôi phục mặc định, chữ lớn 125%, giảm chuyển động và bảng màu dễ phân biệt. Màn hình chỉ hướng Bóng Mực mới xuất hiện, báo gió, đèn yếu và 10 giây cuối.
+
 ## Kiểm thử và headless
 
 ```sh
 node scripts/verify.mjs
 node scripts/headless.mjs --seed 42 --night 2 --scenario docs/phase-2/proof/charm.scenario.json --inputs docs/phase-2/proof/charm.inputs.json --ticks 30 --out charm.jsonl
 ```
+
+### Benchmark, soak và xuất điểm
+
+Từ thư mục repo, chạy các lệnh độc lập sau theo nhu cầu. Benchmark cần Chrome desktop có WebGL. Có thể đặt biến môi trường `LANTERN_CHROME` thành đường dẫn chương trình Chrome trên máy.
+
+```sh
+node scripts/bench.mjs --seed 42 --duration 30 --out bench.json
+node --jitless --expose-gc scripts/soak.mjs --seed 7 --nights 10 --out soak.json
+node scripts/serve.mjs --export-leaderboard out.json
+```
+
+Benchmark tự mở cửa sổ Chrome riêng với canvas 1280×720 và yêu cầu tắt vsync bằng `--disable-gpu-vsync --disable-frame-rate-limit`. Giá trị vsync trong báo cáo là cấu hình yêu cầu tới Chromium; compositor và trình điều khiển có thể giới hạn nhịp thực tế. Sau 3 giây khởi động, đo khoảng thời gian thực giữa các khung bằng đồng hồ trình duyệt. RSS của một tab trải trên nhiều tiến trình Chromium, nên bản web xuất `peak_mem_mb: null`. L1–L3 đầy dầu. Mây đứng yên, 200 Bóng đi lang thang, 100 đom đóm, camera quay một vòng mỗi 15 giây. Phép đo dùng renderer của trò chơi.
+
+Soak dùng i từ 0, seed đầu tiên là 7. Chạy Node không JIT và thu gom ở cuối mỗi Đêm; hai mốc dùng RSS thực của cùng tiến trình. [Số đo benchmark](bench.json) · [Số đo soak](soak.json) · [Tổng hợp test](docs/phase-4/proof/summary.json) · [Kiểm thử trình duyệt](docs/phase-4/proof/browser.json) · [Retro](docs/phase-4/retro.md)
 
 `--scenario` nhận trạng thái thử nghiệm JSON. `--inputs` nhận các frame điều khiển JSON. Tệp `--out` chứa snapshot, sự kiện và dòng tổng kết. Mặc định ghi snapshot mỗi 10 tick. Headless chạy cùng mô phỏng với bản chơi và không cần trình duyệt.
 
