@@ -1,10 +1,11 @@
 const STORAGE_KEY = 'dao-den-long.settings.v1';
-const defaults = { volume: 0.35, sensitivity: 1 };
+const defaults = { volume: 0.35, sensitivity: 1, accessibleColors: false };
 
 export function loadSettings(storage) {
   const settings = { ...defaults };
   try {
     const saved = JSON.parse(storage.getItem(STORAGE_KEY));
+    if (typeof saved?.accessibleColors === 'boolean') settings.accessibleColors = saved.accessibleColors;
     if (Number.isFinite(saved?.volume)) settings.volume = Math.min(1, Math.max(0, saved.volume));
     if (Number.isFinite(saved?.sensitivity)) settings.sensitivity = Math.min(2, Math.max(0.25, saved.sensitivity));
   } catch {

@@ -10,7 +10,7 @@ const ui = Object.fromEntries([
   'score', 'lantern-count', 'lantern-pips', 'clock', 'notice', 'prompt', 'overlay', 'overlay-tag',
   'overlay-title', 'overlay-description', 'overlay-action',
   'pause-options', 'restart-night', 'back-menu', 'menu-settings', 'pause-settings', 'settings',
-  'volume', 'volume-value', 'sensitivity', 'sensitivity-value', 'settings-status',
+  'accessibleColors', 'threshold', 'volume', 'volume-value', 'sensitivity', 'sensitivity-value', 'settings-status',
   'night-intro', 'enter-night', 'night-name', 'night-story', 'chapter', 'mote-bar', 'dash-status', 'pulse-status', 'direction', 'wind-notice',
 ].map((id) => [id, byId(id)]));
 
@@ -44,9 +44,9 @@ audio.setVolume(settings.volume);
 let currentNight = 1;
 let totalScore = 0;
 const nightStories = [
-  'Ông Đăng nói: “Mây à, mỗi đốm sáng là một lời hứa. Hãy thắp lại năm chiếc đèn của Đảo Bến.”',
+  'Ông Đăng nói: “Mây à, mỗi đốm sáng là một lời hứa. Giữ ít nhất ba chiếc đèn sáng khi trời hửng. Đèn yếu cần được châm thêm dầu.”',
   'Ông Đăng nói: “Cầu tre nối hai bờ Đảo Cau. Dùng bục nhảy và Bùa Gió, nhưng coi chừng Gió Lạc cướp ánh sáng.”',
-  'Ông Đăng nói: “Lên dốc rồi tìm bục nhảy tới tháp chuông. Thắp đủ bảy đèn để gọi Bình Minh.”',
+  'Ông Đăng nói: “Lên dốc rồi tìm bục nhảy tới tháp chuông. Giữ ít nhất năm đèn sáng tới Bình Minh.”',
 ];
 
 function setMode(next) {
@@ -116,14 +116,13 @@ function end(reason) {
   setMode('ended');
   const won = night.state === 'won';
   const detail = {
-    all_lit: 'Cả năm chiếc đèn đã sáng. Đảo Bến đã thoát khỏi sương đen.',
     dawn: 'Bình minh đến trước khi Mây thắp lại đủ đèn.',
     no_flames: 'Mây đã cạn sinh lực. Hãy tìm nơi an toàn quanh những chiếc đèn sáng.',
   };
   if (won) totalScore += night.score;
   overlay(won ? 'Chiến thắng' : `Kết thúc Đêm ${currentNight}`,
     won ? (currentNight === 3 ? 'Bình Minh' : `${night.map.name} bừng sáng`) : 'Ánh sáng đã tắt',
-    `${won ? 'Tất cả đèn đã sáng.' : detail[reason]} Điểm Đêm: ${night.score}. Tổng điểm các Đêm đã thắng: ${totalScore}.`,
+    `${won ? 'Mây đã giữ đảo sáng đến bình minh.' : detail[reason]} Điểm Đêm: ${night.score}. Tổng điểm các Đêm đã thắng: ${totalScore}.`,
     won ? (currentNight === 3 ? 'Về menu' : 'Đêm kế tiếp') : 'Chơi lại');
 }
 
@@ -156,10 +155,10 @@ function advance(now) {
   const requestedInteract = input.interact && !night.previousInput.interact;
   const jumping = input.jump && !night.previousInput.jump && night.player.pos[1] === 0;
   const events = night.step(input);
-  if (requestedInteract && !events.some((event) => event.name === 'deposit')) {
+  if (requestedInteract && !events.some((event) => ['deposit', 'refuel'].includes(event.name))) {
     showNotice(night.nearbyLantern()
       ? 'Túi đang trống. Hãy nhặt đom đóm để nạp ánh sáng.'
-      : 'Hãy đứng cách đèn chưa sáng tối đa 2 m rồi nhấn E.', now);
+      : 'Hãy đứng cách đèn cần nạp tối đa 2 m rồi nhấn E.', now);
   }
   if (jumping) audio.effect('jump');
   if (requestedPulse && !couldPulse && !events.some((event) => event.name === 'pulse')) {
@@ -171,15 +170,17 @@ function advance(now) {
       case 'mote_picked':
         pickupUntil = now + 600;
         scene.pickup(night.player.pos, now / 1000);
-        showNotice(`+1 đom đóm · Túi ${data.carried}/10`, now);
+        showNotice(`+1 đom đóm · Túi ${data.carried}/${night.capacity}`, now);
         break;
       case 'deposit':
-        showNotice(`${data.lantern_id}: đã nạp ${data.amount} · ${data.deposited}/10${data.deposited < 10 ? ` — cần thêm ${10 - data.deposited} đom đóm` : ''}`, now);
+        showNotice(`${data.lantern_id}: đã nạp ${data.amount} · ${data.deposited} đom đóm trong đèn`, now);
         break;
       case 'pulse':
         pulseAt = now;
         if (data.stunned_ids.length) showNotice('Đã xua Bóng Mực!', now);
         break;
+      case 'refuel': showNotice(`${data.lantern_id} · Đã châm dầu · ${data.fuel}/100`, now); break;
+      case 'lantern_out': showNotice(`${data.lantern_id} đã cạn dầu. Cần 5 đom đóm để thắp lại.`, now); break;
       case 'lantern_lit': showNotice(`${data.lantern_id} đã sáng! Đứng gần đèn để tránh Bóng Mực.`, now); break;
       case 'player_hit': showNotice('Mây mất một sinh lực.', now); break;
       case 'game_over': end(data.reason); break;
@@ -192,11 +193,15 @@ function updateHud(now) {
   const lanterns = night.lanterns.filter((lantern) => lantern.lit).length;
   ui.flames.textContent = '✦'.repeat(flames) + '✧'.repeat(tuning.flames - flames);
   ui.flames.setAttribute('aria-label', `${flames} trên ${tuning.flames}`);
-  ui.carried.textContent = `${carried}/${tuning.carry_capacity}`;
+  ui.carried.textContent = `${carried}/${night.capacity}`;
   ui.carried.classList.toggle('collecting', now < pickupUntil);
   ui['mote-bar'].classList.toggle('collecting', now < pickupUntil);
   ui.score.textContent = night.score;
   ui['lantern-count'].textContent = `${lanterns}/${night.lanterns.length}`;
+  ui.threshold.textContent = `Bình minh cần ${night.requiredLights} đèn`;
+  if (ui['mote-bar'].childElementCount !== night.capacity) {
+    ui['mote-bar'].replaceChildren(...Array.from({ length: night.capacity }, () => document.createElement('i')));
+  }
   for (const [index, cell] of Array.from(ui['mote-bar'].children).entries()) cell.classList.toggle('filled', index < carried);
   ui['dash-status'].textContent = night.player.charm > 0 ? 'Lướt · Bùa Gió' : `Lướt ${Math.max(0, night.player.dashCd / 60).toFixed(1)}s`;
   ui['pulse-status'].textContent = `Tỏa sáng ${Math.max(0, night.player.pulseCd / 60).toFixed(1)}s`;
@@ -220,7 +225,8 @@ function updateHud(now) {
   const nearby = night.nearbyLantern();
   ui.prompt.hidden = !nearby || mode !== 'playing';
   if (nearby) {
-    const message = `E — Nạp ánh sáng (${nearby.deposited}/10)`;
+    const message = nearby.lit ? `E — Châm dầu (${Math.floor(nearby.fuelUnits / 60)}/100)`
+      : `E — Nạp ánh sáng (${nearby.deposited}/${nearby.ever_lit ? tuning.relight_cost : tuning.lantern_cost})`;
     if (ui.prompt.textContent !== message) ui.prompt.textContent = message;
   }
   renderMap();
@@ -254,7 +260,7 @@ function renderMap() {
   ctx.stroke();
   const map = ([x, , z]) => [center + (x - (currentNight === 2 ? 35 : 0)) * scale, center - z * scale];
   for (const mote of night.motes) disc(...map(mote.pos), 0.9, '#b58d5c');
-  for (const shade of night.shades) disc(...map(shade.pos), 2.4, '#b780e1');
+  for (const shade of night.shades) disc(...map(shade.pos), 2.4, settings.accessibleColors ? '#00B3FF' : '#7A3CFF');
   for (const lantern of night.lanterns) {
     const [x, y] = map(lantern.pos);
     disc(x, y, 4.3, lantern.lit ? '#ffca6d' : '#777b9b');
@@ -319,12 +325,19 @@ function bindControls() {
   });
   function openSettings() {
     audio.unlock();
+    ui.accessibleColors.checked = settings.accessibleColors;
     ui.volume.value = settings.volume;
     ui.sensitivity.value = settings.sensitivity;
     ui['volume-value'].textContent = `${Math.round(settings.volume * 100)}%`;
     ui['sensitivity-value'].textContent = `${settings.sensitivity.toFixed(2)}×`;
     ui.settings.showModal();
   }
+  ui.accessibleColors.addEventListener('change', () => {
+    settings.accessibleColors = ui.accessibleColors.checked;
+    document.body.classList.toggle('accessible', settings.accessibleColors);
+    scene.accessibleColors = settings.accessibleColors;
+    ui['settings-status'].textContent = saveSettings(storage, settings) ? 'Đã lưu.' : 'Áp dụng trong phiên này.';
+  });
   ui['menu-settings'].addEventListener('click', openSettings);
   ui['pause-settings'].addEventListener('click', openSettings);
   for (const key of ['volume', 'sensitivity']) {
@@ -390,6 +403,8 @@ try {
   ({ tuning } = await response.json());
   night = new Night(tuning, 42);
   scene = new Scene(ui.scene);
+  scene.accessibleColors = settings.accessibleColors;
+  document.body.classList.toggle('accessible', settings.accessibleColors);
   for (const lantern of night.lanterns) ui['lantern-pips'].append(document.createElement('i'));
   bindControls();
   ui.start.disabled = false;

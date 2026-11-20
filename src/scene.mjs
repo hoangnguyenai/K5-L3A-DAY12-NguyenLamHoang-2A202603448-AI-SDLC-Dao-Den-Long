@@ -248,6 +248,7 @@ export class Scene {
     const orbit = preview ? 0.48 + Math.sin(time * 0.18) * 0.12 : yaw;
     const cameraDistance = preview ? 37 : 11.5;
     const cameraHeight = preview ? 24 : 7.2;
+    this.orbit = orbit;
     const eye = [x - Math.sin(orbit) * cameraDistance, y + cameraHeight, z - Math.cos(orbit) * cameraDistance];
     const target = [x + Math.sin(orbit) * 3, 1.6 + y, z + Math.cos(orbit) * 3];
     this.projection = perspective(width / height);
@@ -395,15 +396,31 @@ export class Scene {
     }
   }
 
-  lantern({ pos: [x, y, z], lit, deposited }, time) {
-    this.draw('disc', [x, y + 0.014, z], [lit ? 6 : 1.8, 1, lit ? 6 : 1.8], lit ? palette.oldGold : palette.trail);
+  lantern({ pos: [x, y, z], lit, deposited, fuelUnits }, time) {
+    const fuel = fuelUnits / 60;
+    const glow = fuel < 30 ? 0.55 + 0.35 * Math.cos(TAU * time) : 0.9;
+    const radius = lit && fuel >= 30 ? 6 : 1.8;
+    this.draw('disc', [x, y + 0.014, z], [radius, 1, radius], lit ? palette.oldGold : palette.trail);
     this.draw('cylinder', [x, y, z], [1.15, 0.24, 1.15], palette.rock);
     this.draw('cylinder', [x, y + 0.24, z], [0.32, 2.36, 0.32], palette.bronze);
     this.draw('cylinder', [x, y + 2.37, z], [0.75, 0.22, 0.75], palette.oldGold);
-    this.draw('sphere', [x, y + 3.03, z], [0.77, 0.59, 0.77], lit ? palette.gold : palette.glass, 0, lit ? 0.9 : deposited * 0.06);
+    this.draw('sphere', [x, y + 3.03, z], [0.77, lit ? 0.59 : 0.472, 0.77], lit ? palette.gold : palette.glass, 0, lit ? glow : deposited * 0.06);
     this.draw('cone', [x, y + 3.47, z], [0.96, 0.65, 0.96], palette.bronze, Math.PI / 8);
     this.draw('diamond', [x, y + 4.2, z], [0.16, 0.22, 0.16], palette.straw, time, lit ? 0.8 : 0.2);
+    const horizontal = [Math.cos(this.orbit), -Math.sin(this.orbit)];
+    const front = [-Math.sin(this.orbit), -Math.cos(this.orbit)];
+    if (!lit) {
+      for (let i = 0; i < 3; i++) {
+        const offset = (i % 2) * 0.07;
+        this.draw('diamond', [x + front[0] * 0.76 + horizontal[0] * offset, y + 2.91 + i * 0.10,
+          z + front[1] * 0.76 + horizontal[1] * offset], [0.075, 0.10, 0.075], palette.shadow);
+      }
+    }
     if (lit) {
+      const level = fuel / 100;
+      this.draw('cylinder', [x, y + 4.65, z], [1.1, 0.13, 0.11], palette.bronze, this.orbit);
+      this.draw('cylinder', [x + horizontal[0] * (level - 1), y + 4.67,
+        z + horizontal[1] * (level - 1)], [level, 0.10, 0.16], palette.whiteGold, this.orbit, glow);
       for (let index = 0; index < 6; index++) {
         const angle = index * TAU / 6 + time * 0.7;
         this.draw('diamond', [x + Math.sin(angle) * 1.45, y + 2.4 + Math.sin(angle * 2) * 0.55, z + Math.cos(angle) * 1.45],
@@ -414,14 +431,16 @@ export class Scene {
 
   shade({ pos: [x, y, z], state }, player, time) {
     const angle = Math.atan2(player[0] - x, player[2] - z);
+    const outline = this.accessibleColors ? rgb('#00B3FF') : palette.violet;
     const body = Math.max(0.75, y) + Math.sin(time * 4 + x) * 0.13;
     this.draw('disc', [x, 0.018, z], [0.88, 1, 0.88], palette.shadow);
+    this.draw('cylinder', [x, body - 0.58, z], [0.72, 0.07, 0.67], outline, angle, 0.55);
     this.draw('bell', [x, body - 0.57, z], [0.71, 1.43, 0.66], state === 'stunned' ? palette.stunned : palette.plum, angle);
     this.draw('sphere', [x, body + 0.52, z], [0.59, 0.59, 0.58], state === 'stunned' ? palette.stunned : palette.plum, angle);
     for (const side of [-1, 1]) {
       const px = x + Math.cos(angle) * side * 0.22 + Math.sin(angle) * 0.51;
       const pz = z - Math.sin(angle) * side * 0.22 + Math.cos(angle) * 0.51;
-      this.draw('sphere', [px, body + 0.55, pz], [0.117, 0.08, 0.10], palette.violet, angle, 0.85);
+      this.draw('sphere', [px, body + 0.55, pz], [0.117, 0.08, 0.10], outline, angle, 0.85);
     }
     if (state === 'stunned') this.draw('diamond', [x, body + 1.52, z], [0.17, 0.24, 0.17], palette.whiteGold, time * 2, 0.8);
   }

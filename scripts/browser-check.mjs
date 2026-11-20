@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 // Chạy trình duyệt kiểm thử riêng cho bản web local. Không dùng profile người học.
 const root = fileURLToPath(new URL('../', import.meta.url));
-const proof = join(root, 'docs', 'phase-2', 'proof');
+const proof = join(root, 'docs', 'phase-3', 'proof');
 await mkdir(proof, { recursive: true });
 const profile = await mkdtemp(join(tmpdir(), 'lantern-browser-'));
 const executable = process.env.LANTERN_CHROME ?? (process.platform === 'win32'
@@ -86,12 +86,13 @@ try {
   await waitFor(`document.getElementById('start')?.disabled === false`);
   await screenshot('menu.png');
   await click('menu-settings');
-  await evaluate(`document.getElementById('volume').value = '0.6'; document.getElementById('volume').dispatchEvent(new Event('input')); document.getElementById('sensitivity').value = '1.5'; document.getElementById('sensitivity').dispatchEvent(new Event('input')); document.getElementById('settings').close();`);
+  await evaluate(`document.getElementById('volume').value = '0.6'; document.getElementById('volume').dispatchEvent(new Event('input')); document.getElementById('sensitivity').value = '1.5'; document.getElementById('sensitivity').dispatchEvent(new Event('input')); document.getElementById('accessibleColors').click(); document.getElementById('settings').close();`);
   await command('Page.reload');
   await waitFor(`document.getElementById('start')?.disabled === false`);
   await click('menu-settings');
   assert.equal(await evaluate(`document.getElementById('volume').value`), '0.6');
   assert.equal(await evaluate(`document.getElementById('sensitivity').value`), '1.5');
+  assert.equal(await evaluate(`document.getElementById('accessibleColors').checked`), true);
   await screenshot('settings.png');
   await evaluate(`document.getElementById('settings').close()`);
   await click('start');
@@ -144,7 +145,7 @@ try {
       document.body.append(canvas);
       const scene = new Scene(canvas);
       const game = new Night(tuning, 42, { player: { pos: ${night === 2 ? '[35,0,0]' : '[0,6,15]'} } }, ${night});
-      for (const lantern of game.lanterns.slice(0, -1)) lantern.lit = true;
+      for (const lantern of game.lanterns.slice(0, -1)) { lantern.lit = true; lantern.fuelUnits = 1500; }
       return await new Promise((resolve) => {
         let start;
         let frames = 0;

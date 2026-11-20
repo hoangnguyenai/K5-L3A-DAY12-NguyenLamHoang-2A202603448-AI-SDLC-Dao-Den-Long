@@ -21,7 +21,7 @@
     <section id="intro" class="intro" aria-labelledby="title">
       <p class="eyebrow"><span aria-hidden="true">✧</span> Đêm 1 <span aria-hidden="true">·</span> Đảo Bến</p>
       <h1 id="title">Đảo Đèn Lồng</h1>
-      <p class="intro-copy">Cùng Mây qua ba hòn đảo, gom đom đóm và thắp lại những chiếc đèn trước bình minh.</p>
+      <p class="intro-copy">Cùng Mây qua ba hòn đảo, gom đom đóm và giữ đảo sáng đến bình minh.</p>
       <button type="button" class="primary" id="start" disabled>Bắt đầu chơi <span aria-hidden="true">→</span></button>
       <button type="button" class="plain" id="menu-settings">Cài đặt</button>
       <p id="load-error" role="alert" hidden></p>
@@ -41,8 +41,8 @@
         </div>
         <div class="panel objective">
           <div class="objective-line"><span class="hud-label">Điểm</span><strong id="score" class="resource-value"></strong></div>
-          <div class="objective-line"><span class="hud-label">Đèn đã thắp</span><strong id="lantern-count"></strong></div>
-          <div id="lantern-pips" class="pips" aria-hidden="true"></div>
+          <div class="objective-line"><span class="hud-label">Đèn đang sáng</span><strong id="lantern-count"></strong></div>
+          <small id="threshold"></small><div id="lantern-pips" class="pips" aria-hidden="true"></div>
           <div class="objective-line"><span class="hud-label">Đến bình minh</span><time id="clock"></time></div>
           <canvas id="map" width="150" height="150" aria-label="Bản đồ vị trí của Mây và các Đèn Lồng Lớn"></canvas>
         </div>
@@ -74,6 +74,7 @@
       <input id="volume" type="range" min="0" max="1" step="0.05">
       <label class="setting" for="sensitivity">Độ nhạy chuột <output id="sensitivity-value"></output></label>
       <input id="sensitivity" type="range" min="0.25" max="2" step="0.05">
+      <label class="setting"><input type="checkbox" id="accessibleColors"> Bảng màu dễ phân biệt</label>
       <p id="settings-status" role="status"></p>
       <form method="dialog"><button class="primary" type="submit">Đóng</button></form>
     </dialog>

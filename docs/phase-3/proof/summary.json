@@ -1,0 +1,153 @@
+{
+  "node": "v22.15.1",
+  "platform": "win32",
+  "cpu": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+  "scenarios": [
+    {
+      "scenario": "drain",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 60,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "relight",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1,
+        "state": "playing",
+        "score": 65
+      }
+    },
+    {
+      "scenario": "refuel",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1,
+        "state": "playing",
+        "score": 45
+      }
+    },
+    {
+      "scenario": "pause",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 40,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "dash",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 15,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "charm",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 30,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "drifter-steal",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "drifter-drop",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "fall",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 61,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "pad",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 85,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "wind",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1801,
+        "state": "playing",
+        "score": 0
+      }
+    },
+    {
+      "scenario": "night-1-win",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1,
+        "state": "won",
+        "score": 1046
+      }
+    },
+    {
+      "scenario": "night-2-win",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1,
+        "state": "won",
+        "score": 1195
+      }
+    },
+    {
+      "scenario": "night-3-win",
+      "deterministic": true,
+      "end": {
+        "type": "end",
+        "ticks": 1,
+        "state": "won",
+        "score": 1344
+      }
+    }
+  ],
+  "benchmark": {
+    "ticks": 18000,
+    "elapsed_ms": 3662.184799999999,
+    "limit_ms": 30000,
+    "note": "Bất tử đủ lâu và tắt gió để chạy trọn thời lượng, giữ lịch sinh thực thể mặc định."
+  }
+}

@@ -37,7 +37,7 @@ test('headless pause giữ thời gian, cooldown, TTL và sim_tick; cạnh nút 
   const snapshots = rows.filter((row) => row.type === 'snapshot');
   assert.equal(snapshots[10].state, 'paused');
   assert.equal(snapshots[10].sim_tick, 0);
-  assert.equal(snapshots[10].time_left_s, 300);
+  assert.equal(snapshots[10].time_left_s, 240);
   assert.equal(snapshots[10].player.pulse_cd_s, 100 / 60);
   assert.equal(snapshots[10].motes[0].ttl_s, 100 / 60);
   assert.equal(snapshots[11].sim_tick, 1);
@@ -165,9 +165,9 @@ test('lịch sinh chuẩn, thực thể mới không tương tác trong tick sin
 test('cài đặt lưu và đọc lại, dữ liệu hỏng quay về mặc định', () => {
   const data = new Map();
   const storage = { getItem: (key) => data.get(key), setItem: (key, value) => data.set(key, value) };
-  assert.equal(saveSettings(storage, { volume: 0.6, sensitivity: 1.5 }), true);
-  assert.deepEqual(loadSettings(storage), { volume: 0.6, sensitivity: 1.5 });
-  assert.deepEqual(loadSettings({ getItem: () => '{oops' }), { volume: 0.35, sensitivity: 1 });
+  assert.equal(saveSettings(storage, { volume: 0.6, sensitivity: 1.5, accessibleColors: true }), true);
+  assert.deepEqual(loadSettings(storage), { volume: 0.6, sensitivity: 1.5, accessibleColors: true });
+  assert.deepEqual(loadSettings({ getItem: () => '{oops' }), { volume: 0.35, sensitivity: 1, accessibleColors: false });
 });
 
 test('CLI từ chối pause sai kiểu và id trùng với mã 2', () => {

@@ -54,9 +54,9 @@ function validateScenario(scenario, tuning, night) {
   optional(scenario, 'player', isObject, 'scenario');
   if (scenario.player) {
     optional(scenario.player, 'pos', (pos) => isVector(pos, 3), 'player');
-    optional(scenario.player, 'carried', (count) => integerIn(count, 0, tuning.carry_capacity), 'player');
+    optional(scenario.player, 'carried', (count) => integerIn(count, 0, Math.min(tuning.capacity_max, tuning.carry_capacity + 2 * (scenario.player.successful_lights ?? 0))), 'player');
     optional(scenario.player, 'flames', (count) => integerIn(count, 0), 'player');
-    for (const key of ['invuln_ticks', 'dash_cd_ticks', 'pulse_cd_ticks', 'charm_ticks']) {
+    for (const key of ['successful_lights', 'invuln_ticks', 'dash_cd_ticks', 'pulse_cd_ticks', 'charm_ticks']) {
       optional(scenario.player, key, (count) => integerIn(count, 0), 'player');
     }
   }
@@ -73,8 +73,9 @@ function validateScenario(scenario, tuning, night) {
     const path = `shades[${index}]`;
     requireValue(isObject(shade) && isVector(shade.pos, 3), `${path}.pos`);
     optional(shade, 'id', (id) => typeof id === 'string' && id.length > 0 && !shadeIds.has(id), path);
+    optional(shade, 'target_lantern_id', (id) => mapFor(night).lanterns.some((_, i) => id === `L${i + 1}`), path);
     if (shade.id) shadeIds.add(shade.id);
-    optional(shade, 'state', (state) => ['spawning', 'wander', 'chase', 'recoil', 'stunned'].includes(state), path);
+    optional(shade, 'state', (state) => ['spawning', 'wander', 'chase', 'recoil', 'stunned', 'drain'].includes(state), path);
     optional(shade, 'state_ticks_left', (count) => integerIn(count, 0), path);
   }
   for (const key of ['drifters', 'charms']) {
@@ -103,6 +104,8 @@ function validateScenario(scenario, tuning, night) {
     const path = `lanterns[${index}]`;
     requireValue(isObject(lantern) && remainingIds.delete(lantern.id), `${path}.id`);
     optional(lantern, 'pos', (pos) => isVector(pos, 3), path);
+    optional(lantern, 'ever_lit', isBoolean, path);
+    optional(lantern, 'fuel', (fuel) => Number.isFinite(fuel) && fuel >= 0 && fuel <= tuning.fuel_max, path);
     optional(lantern, 'lit', isBoolean, path);
     optional(lantern, 'deposited', (count) => integerIn(count, 0, tuning.lantern_cost), path);
   }

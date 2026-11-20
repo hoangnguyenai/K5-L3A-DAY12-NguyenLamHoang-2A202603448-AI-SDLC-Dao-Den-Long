@@ -24,7 +24,7 @@ test('hồi quy nhặt theo XZ và độ cao, sức chứa và nạp nhiều l�
   assert.equal(night.player.carried, 0);
   assert.equal(night.motes.length, 2);
   assert.equal(night.lanterns[0].lit, true);
-  assert.equal(night.score, 200);
+  assert.equal(night.score, 150);
 });
 
 test('hồi quy thắng, thua và không cộng điểm khi dựng scenario', () => {
@@ -33,7 +33,7 @@ test('hồi quy thắng, thua và không cộng điểm khi dựng scenario', ()
   assert.equal(won.score, 0);
   won.step(input({}));
   assert.equal(won.state, 'won');
-  assert.equal(won.score, 150);
+  assert.equal(won.score, 895);
   const lost = new Night(tuning, 42, { ...empty, lanterns, player: { flames: 0 } });
   assert.equal(lost.step(input({})).at(-1).data.reason, 'no_flames');
   const dawn = new Night(tuning, 42, { ...empty, time_left_s: 1 / 60 });

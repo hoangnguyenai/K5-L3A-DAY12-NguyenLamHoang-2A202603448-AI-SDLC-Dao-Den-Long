@@ -118,3 +118,7 @@ kbd { display: inline-block; padding: .16rem .32rem; margin-right: .12rem; borde
   .game[data-mode='playing'] .keys { display: none; }
   .feedback { bottom: 3.1rem; }
 }
+
+.accessible .danger, .accessible .wind-notice { color: #fff !important; }
+.accessible .danger::before, .accessible .wind-notice::before { content: "⚠ "; }
+#threshold { color: #FFE9B0; font-size: .78rem; }
