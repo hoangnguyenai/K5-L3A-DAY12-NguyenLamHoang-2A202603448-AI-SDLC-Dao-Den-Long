@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: headless pause giữ thời gian, cooldown, TTL và sim_tick; cạnh nút tiếp tục
+ok 1 - headless pause giữ thời gian, cooldown, TTL và sim_tick; cạnh nút tiếp tục
+  ---
+  duration_ms: 562.1771
+  type: 'test'
+  ...
+# Subtest: headless lướt đủ 12 tick, giữ độ cao và hướng, không lặp khi giữ nút
+ok 2 - headless lướt đủ 12 tick, giữ độ cao và hướng, không lặp khi giữ nút
+  ---
+  duration_ms: 213.2576
+  type: 'test'
+  ...
+# Subtest: headless Bùa Gió tăng tốc, cho lướt lại và hồi bùa đúng thời gian
+ok 3 - headless Bùa Gió tăng tốc, cho lướt lại và hồi bùa đúng thời gian
+  ---
+  duration_ms: 446.52
+  type: 'test'
+  ...
+# Subtest: headless Gió Lạc cướp trước hit, bỏ qua bất tử và thả đồ khi trúng pulse
+ok 4 - headless Gió Lạc cướp trước hit, bỏ qua bất tử và thả đồ khi trúng pulse
+  ---
+  duration_ms: 1816.295
+  type: 'test'
+  ...
+# Subtest: headless pulse dùng khoảng cách 3D, choáng 120 tick và đẩy 4m trong 15 tick
+ok 5 - headless pulse dùng khoảng cách 3D, choáng 120 tick và đẩy 4m trong 15 tick
+  ---
+  duration_ms: 515.3978
+  type: 'test'
+  ...
+# Subtest: headless rơi mất đồ bỏ qua bất tử, hồi sinh sau 60 tick đúng một hit
+ok 6 - headless rơi mất đồ bỏ qua bất tử, hồi sinh sau 60 tick đúng một hit
+  ---
+  duration_ms: 350.3769
+  type: 'test'
+  ...
+# Subtest: headless bục nhảy Đảo Cau giữ vận tốc phóng và đáp trên đảo đích
+ok 7 - headless bục nhảy Đảo Cau giữ vận tốc phóng và đáp trên đảo đích
+  ---
+  duration_ms: 252.9359
+  type: 'test'
+  ...
+# Subtest: headless gió chỉ Đêm 3, báo lịch 1800 và pause ngăn tiến gió
+ok 8 - headless gió chỉ Đêm 3, báo lịch 1800 và pause ngăn tiến gió
+  ---
+  duration_ms: 624.351
+  type: 'test'
+  ...
+# Subtest: bản đồ chuẩn, dốc, vách, tháp và pad Đêm 3
+ok 9 - bản đồ chuẩn, dốc, vách, tháp và pad Đêm 3
+  ---
+  duration_ms: 7.0258
+  type: 'test'
+  ...
+# Subtest: lịch sinh chuẩn, thực thể mới không tương tác trong tick sinh
+ok 10 - lịch sinh chuẩn, thực thể mới không tương tác trong tick sinh
+  ---
+  duration_ms: 61.606
+  type: 'test'
+  ...
+# Subtest: cài đặt lưu và đọc lại, dữ liệu hỏng quay về mặc định
+ok 11 - cài đặt lưu và đọc lại, dữ liệu hỏng quay về mặc định
+  ---
+  duration_ms: 2.5653
+  type: 'test'
+  ...
+# Subtest: CLI từ chối pause sai kiểu và id trùng với mã 2
+ok 12 - CLI từ chối pause sai kiểu và id trùng với mã 2
+  ---
+  duration_ms: 331.0875
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5293.8727

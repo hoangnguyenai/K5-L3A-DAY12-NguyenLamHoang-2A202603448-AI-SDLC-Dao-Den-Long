@@ -1,16 +1,22 @@
 import { initialInput, ISLAND_RADIUS, Night, TICK_RATE } from './simulation.mjs';
 import { Scene } from './scene.mjs';
+import { GameAudio } from './audio.mjs';
+import { loadSettings, saveSettings } from './settings.mjs';
+import { mapFor } from './maps.mjs';
 
 const byId = (id) => document.getElementById(id);
 const ui = Object.fromEntries([
   'game', 'scene', 'map', 'intro', 'start', 'load-error', 'hud', 'pause', 'touch', 'flames', 'carried',
   'score', 'lantern-count', 'lantern-pips', 'clock', 'notice', 'prompt', 'overlay', 'overlay-tag',
   'overlay-title', 'overlay-description', 'overlay-action',
+  'pause-options', 'restart-night', 'back-menu', 'menu-settings', 'pause-settings', 'settings',
+  'volume', 'volume-value', 'sensitivity', 'sensitivity-value', 'settings-status',
+  'night-intro', 'enter-night', 'night-name', 'night-story', 'chapter', 'mote-bar', 'dash-status', 'pulse-status', 'direction', 'wind-notice',
 ].map((id) => [id, byId(id)]));
 
 const controls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight',
-  'KeyQ', 'KeyR', 'Space', 'KeyE', 'KeyF']);
-const actions = new Set(['Space', 'KeyE', 'KeyF']);
+  'KeyQ', 'KeyR', 'Space', 'KeyE', 'KeyF', 'ShiftLeft', 'ShiftRight']);
+const actions = new Set(['Space', 'KeyE', 'KeyF', 'ShiftLeft', 'ShiftRight']);
 const keys = new Set();
 const pending = new Set();
 const stepMs = 1000 / TICK_RATE;
@@ -20,34 +26,71 @@ let tuning;
 let mode = 'menu';
 let yaw = 0;
 let pulseAt = -Infinity;
+let pickupUntil = 0;
 let noticeUntil = 0;
 let drag;
 let accumulator = 0;
 let previousTime;
 let hudAt = -Infinity;
+let lastCountdown;
+let windWasWarning = false;
+let fpsWindowStart;
+let fpsFrames = 0;
+const audio = new GameAudio();
+let storage;
+try { storage = window.localStorage; } catch { /* Cài đặt vẫn có hiệu lực trong phiên. */ }
+const settings = loadSettings(storage);
+audio.setVolume(settings.volume);
+let currentNight = 1;
+let totalScore = 0;
+const nightStories = [
+  'Ông Đăng nói: “Mây à, mỗi đốm sáng là một lời hứa. Hãy thắp lại năm chiếc đèn của Đảo Bến.”',
+  'Ông Đăng nói: “Cầu tre nối hai bờ Đảo Cau. Dùng bục nhảy và Bùa Gió, nhưng coi chừng Gió Lạc cướp ánh sáng.”',
+  'Ông Đăng nói: “Lên dốc rồi tìm bục nhảy tới tháp chuông. Thắp đủ bảy đèn để gọi Bình Minh.”',
+];
 
 function setMode(next) {
   mode = next;
   ui.game.dataset.mode = next;
   ui.intro.hidden = next !== 'menu';
-  ui.hud.hidden = next === 'menu';
+  ui['night-intro'].hidden = next !== 'introduction';
+  ui.hud.hidden = next === 'menu' || next === 'introduction';
   ui.pause.hidden = next !== 'playing';
   ui.touch.hidden = next !== 'playing';
   ui.overlay.hidden = next !== 'paused' && next !== 'ended';
+  ui['pause-options'].hidden = next !== 'paused';
+  audio.playing = next === 'playing';
   keys.clear();
   pending.clear();
   accumulator = 0;
 }
 
 function start() {
-  night = new Night(tuning, 42);
+  audio.unlock();
+  fpsWindowStart = performance.now();
+  fpsFrames = 0;
+  delete ui.scene.dataset.averageFps;
+  night = new Night(tuning, 42, {}, currentNight);
+  ui.chapter.textContent = `Đêm ${currentNight} / ${night.map.name}`;
+  ui['lantern-pips'].replaceChildren(...night.lanterns.map(() => document.createElement('i')));
   yaw = 0;
   pulseAt = -Infinity;
+  pickupUntil = 0;
   noticeUntil = 0;
+  lastCountdown = undefined;
+  windWasWarning = false;
   ui.notice.hidden = true;
   setMode('playing');
   updateHud(performance.now());
   ui.scene.focus();
+}
+
+function introduce() {
+  night = new Night(tuning, 42, {}, currentNight);
+  setMode('introduction');
+  ui['night-name'].textContent = `Đêm ${currentNight} · ${night.map.name}`;
+  ui['night-story'].textContent = nightStories[currentNight - 1];
+  ui['enter-night'].focus();
 }
 
 function overlay(tag, title, description, action) {
@@ -61,7 +104,7 @@ function overlay(tag, title, description, action) {
 function pause() {
   if (mode !== 'playing') return;
   setMode('paused');
-  overlay('Đêm 1 · Đảo Bến', 'Tạm dừng', 'Mây sẽ chờ bạn quay lại.', 'Tiếp tục');
+  overlay(`Đêm ${currentNight} · ${night.map.name}`, 'Tạm dừng', 'Mây sẽ chờ bạn quay lại.', 'Tiếp tục');
 }
 
 function resume() {
@@ -77,8 +120,11 @@ function end(reason) {
     dawn: 'Bình minh đến trước khi Mây thắp lại đủ đèn.',
     no_flames: 'Mây đã cạn sinh lực. Hãy tìm nơi an toàn quanh những chiếc đèn sáng.',
   };
-  overlay(won ? 'Chiến thắng' : 'Kết thúc Đêm 1', won ? 'Đảo Bến bừng sáng' : 'Ánh sáng đã tắt',
-    `${detail[reason]} Điểm của bạn: ${night.score}.`, 'Chơi lại');
+  if (won) totalScore += night.score;
+  overlay(won ? 'Chiến thắng' : `Kết thúc Đêm ${currentNight}`,
+    won ? (currentNight === 3 ? 'Bình Minh' : `${night.map.name} bừng sáng`) : 'Ánh sáng đã tắt',
+    `${won ? 'Tất cả đèn đã sáng.' : detail[reason]} Điểm Đêm: ${night.score}. Tổng điểm các Đêm đã thắng: ${totalScore}.`,
+    won ? (currentNight === 3 ? 'Về menu' : 'Đêm kế tiếp') : 'Chơi lại');
 }
 
 function showNotice(message, now) {
@@ -98,6 +144,7 @@ function readControls() {
   input.jump = action('Space');
   input.interact = action('KeyE');
   input.pulse = action('KeyF');
+  input.dash = action('ShiftLeft') || action('ShiftRight');
   pending.clear();
   return input;
 }
@@ -106,17 +153,34 @@ function advance(now) {
   const input = readControls();
   const couldPulse = night.player.carried >= tuning.pulse_cost;
   const requestedPulse = input.pulse && !night.previousInput.pulse;
+  const requestedInteract = input.interact && !night.previousInput.interact;
+  const jumping = input.jump && !night.previousInput.jump && night.player.pos[1] === 0;
   const events = night.step(input);
+  if (requestedInteract && !events.some((event) => event.name === 'deposit')) {
+    showNotice(night.nearbyLantern()
+      ? 'Túi đang trống. Hãy nhặt đom đóm để nạp ánh sáng.'
+      : 'Hãy đứng cách đèn chưa sáng tối đa 2 m rồi nhấn E.', now);
+  }
+  if (jumping) audio.effect('jump');
   if (requestedPulse && !couldPulse && !events.some((event) => event.name === 'pulse')) {
     showNotice(`Cần ${tuning.pulse_cost} đom đóm để tỏa sáng.`, now);
   }
   for (const { name, data } of events) {
+    audio.effect(name === 'game_over' ? data.result : name);
     switch (name) {
+      case 'mote_picked':
+        pickupUntil = now + 600;
+        scene.pickup(night.player.pos, now / 1000);
+        showNotice(`+1 đom đóm · Túi ${data.carried}/10`, now);
+        break;
+      case 'deposit':
+        showNotice(`${data.lantern_id}: đã nạp ${data.amount} · ${data.deposited}/10${data.deposited < 10 ? ` — cần thêm ${10 - data.deposited} đom đóm` : ''}`, now);
+        break;
       case 'pulse':
         pulseAt = now;
         if (data.stunned_ids.length) showNotice('Đã xua Bóng Mực!', now);
         break;
-      case 'lantern_lit': showNotice('Đèn đã sáng. Hãy đứng gần đèn để tránh Bóng Mực.', now); break;
+      case 'lantern_lit': showNotice(`${data.lantern_id} đã sáng! Đứng gần đèn để tránh Bóng Mực.`, now); break;
       case 'player_hit': showNotice('Mây mất một sinh lực.', now); break;
       case 'game_over': end(data.reason); break;
     }
@@ -129,29 +193,55 @@ function updateHud(now) {
   ui.flames.textContent = '✦'.repeat(flames) + '✧'.repeat(tuning.flames - flames);
   ui.flames.setAttribute('aria-label', `${flames} trên ${tuning.flames}`);
   ui.carried.textContent = `${carried}/${tuning.carry_capacity}`;
+  ui.carried.classList.toggle('collecting', now < pickupUntil);
+  ui['mote-bar'].classList.toggle('collecting', now < pickupUntil);
   ui.score.textContent = night.score;
-  ui['lantern-count'].textContent = `${lanterns}/${tuning.lantern_count_night1}`;
+  ui['lantern-count'].textContent = `${lanterns}/${night.lanterns.length}`;
+  for (const [index, cell] of Array.from(ui['mote-bar'].children).entries()) cell.classList.toggle('filled', index < carried);
+  ui['dash-status'].textContent = night.player.charm > 0 ? 'Lướt · Bùa Gió' : `Lướt ${Math.max(0, night.player.dashCd / 60).toFixed(1)}s`;
+  ui['pulse-status'].textContent = `Tỏa sáng ${Math.max(0, night.player.pulseCd / 60).toFixed(1)}s`;
   for (const [index, pip] of Array.from(ui['lantern-pips'].children).entries()) {
     pip.classList.toggle('lit', night.lanterns[index].lit);
   }
   const remaining = Math.ceil(night.timeLeft);
+  ui.clock.classList.toggle('danger', remaining <= 30);
+  const windWarning = night.windEnabled && night.simTick % 1800 >= 1680;
+  ui['wind-notice'].hidden = !windWarning && !night.wind.active;
+  ui['wind-notice'].textContent = night.wind.active ? '❧ Gió mạnh đang thổi' : '❧ Gió mạnh sắp đến';
+  if (windWarning && !windWasWarning) audio.effect('wind');
+  windWasWarning = windWarning;
+  if (mode === 'playing' && remaining > 0 && remaining <= 10 && lastCountdown !== remaining) {
+    audio.effect('countdown');
+    lastCountdown = remaining;
+  }
   ui.clock.textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
   ui.clock.setAttribute('datetime', `PT${remaining}S`);
   ui.notice.hidden = now >= noticeUntil;
   const nearby = night.nearbyLantern();
   ui.prompt.hidden = !nearby || mode !== 'playing';
   if (nearby) {
-    const message = carried ? `E · Nạp đèn (${nearby.deposited}/${tuning.lantern_cost})` : 'Nhặt đom đóm để nạp đèn.';
+    const message = `E — Nạp ánh sáng (${nearby.deposited}/10)`;
     if (ui.prompt.textContent !== message) ui.prompt.textContent = message;
   }
   renderMap();
+  const target = night.lanterns.filter((lantern) => !lantern.lit).sort((a, b) =>
+    Math.hypot(a.pos[0] - night.player.pos[0], a.pos[2] - night.player.pos[2])
+    - Math.hypot(b.pos[0] - night.player.pos[0], b.pos[2] - night.player.pos[2]))[0];
+  if (target) {
+    const dx = target.pos[0] - night.player.pos[0];
+    const dz = target.pos[2] - night.player.pos[2];
+    const angle = Math.atan2(dx, dz) - yaw;
+    const outside = !scene.isOnScreen([target.pos[0], target.pos[1] + 3, target.pos[2]]);
+    ui.direction.hidden = !outside;
+    ui.direction.textContent = `${Math.sin(angle) < 0 ? '←' : '→'} ${target.id} · ${Math.round(Math.hypot(dx, dz))} m`;
+  } else ui.direction.hidden = true;
 }
 
 function renderMap() {
   const ctx = ui.map.getContext('2d');
   const center = ui.map.width / 2;
   const radius = center - 9;
-  const scale = radius / ISLAND_RADIUS;
+  const scale = radius / (currentNight === 2 ? 65 : night.map.radius);
   ctx.clearRect(0, 0, ui.map.width, ui.map.height);
   const disc = (x, y, r, fill) => {
     ctx.beginPath();
@@ -162,7 +252,7 @@ function renderMap() {
   disc(center, center, radius, '#252f42');
   ctx.strokeStyle = '#767d9a';
   ctx.stroke();
-  const map = ([x, , z]) => [center + x * scale, center - z * scale];
+  const map = ([x, , z]) => [center + (x - (currentNight === 2 ? 35 : 0)) * scale, center - z * scale];
   for (const mote of night.motes) disc(...map(mote.pos), 0.9, '#b58d5c');
   for (const shade of night.shades) disc(...map(shade.pos), 2.4, '#b780e1');
   for (const lantern of night.lanterns) {
@@ -185,6 +275,15 @@ function renderMap() {
 }
 
 function frame(now) {
+  fpsWindowStart ??= now;
+  fpsFrames++;
+  if (now - fpsWindowStart >= 5000) {
+    ui.scene.dataset.averageFps = (fpsFrames * 1000 / (now - fpsWindowStart)).toFixed(1);
+    ui.scene.dataset.viewport = `${ui.scene.clientWidth}x${ui.scene.clientHeight}`;
+    fpsWindowStart = now;
+    fpsFrames = 0;
+  }
+  audio.update(now);
   const delta = previousTime === undefined ? 0 : Math.min(now - previousTime, 100);
   previousTime = now;
   if (mode === 'playing') {
@@ -198,7 +297,7 @@ function frame(now) {
     updateHud(now);
     hudAt = now;
   }
-  scene.render(night, yaw, now / 1000, (now - pulseAt) / 1000, mode === 'menu');
+  scene.render(night, yaw, now / 1000, (now - pulseAt) / 1000, mode === 'menu' || mode === 'introduction');
   requestAnimationFrame(frame);
 }
 
@@ -209,11 +308,44 @@ function press(code) {
 
 function bindControls() {
   ui.scene.tabIndex = -1;
-  ui.start.addEventListener('click', start);
+  ui.start.addEventListener('click', () => { currentNight = 1; totalScore = 0; introduce(); });
+  ui['enter-night'].addEventListener('click', start);
   ui.pause.addEventListener('click', pause);
-  ui['overlay-action'].addEventListener('click', () => (mode === 'paused' ? resume() : start()));
+  ui['restart-night'].addEventListener('click', start);
+  ui['back-menu'].addEventListener('click', () => {
+    night = new Night(tuning, 42);
+    setMode('menu');
+    ui.start.focus();
+  });
+  function openSettings() {
+    audio.unlock();
+    ui.volume.value = settings.volume;
+    ui.sensitivity.value = settings.sensitivity;
+    ui['volume-value'].textContent = `${Math.round(settings.volume * 100)}%`;
+    ui['sensitivity-value'].textContent = `${settings.sensitivity.toFixed(2)}×`;
+    ui.settings.showModal();
+  }
+  ui['menu-settings'].addEventListener('click', openSettings);
+  ui['pause-settings'].addEventListener('click', openSettings);
+  for (const key of ['volume', 'sensitivity']) {
+    ui[key].addEventListener('input', () => {
+      settings[key] = Number(ui[key].value);
+      audio.setVolume(settings.volume);
+      ui['volume-value'].textContent = `${Math.round(settings.volume * 100)}%`;
+      ui['sensitivity-value'].textContent = `${settings.sensitivity.toFixed(2)}×`;
+      ui['settings-status'].textContent = saveSettings(storage, settings)
+        ? 'Đã lưu cài đặt.' : 'Cài đặt áp dụng cho phiên này. Trình duyệt đang chặn lưu trữ.';
+    });
+  }
+  ui['overlay-action'].addEventListener('click', () => {
+    if (mode === 'paused') resume();
+    else if (night.state === 'won' && currentNight < 3) { currentNight++; introduce(); }
+    else if (night.state === 'won') { setMode('menu'); ui.start.focus(); }
+    else start();
+  });
   window.addEventListener('keydown', (event) => {
-    if (event.code === 'Escape') {
+    if (ui.settings.open) return;
+    if (event.code === 'Escape' || event.code === 'KeyP') {
       if (event.repeat) return;
       if (mode === 'paused') resume();
       else pause();
@@ -245,7 +377,7 @@ function bindControls() {
   });
   ui.scene.addEventListener('pointermove', (event) => {
     if (drag?.id !== event.pointerId || mode !== 'playing') return;
-    yaw += (event.clientX - drag.x) * 0.008;
+    yaw += (event.clientX - drag.x) * 0.008 * settings.sensitivity;
     drag.x = event.clientX;
   });
   ui.scene.addEventListener('lostpointercapture', () => { drag = undefined; });

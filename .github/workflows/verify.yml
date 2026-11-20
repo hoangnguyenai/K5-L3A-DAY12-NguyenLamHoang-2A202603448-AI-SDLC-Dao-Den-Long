@@ -1,4 +1,4 @@
-name: Verify Phase 1
+name: Verify game
 
 on: [push, pull_request]
 
@@ -16,5 +16,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node scripts/build.mjs
-      - run: node tests/phase-1.mjs
+      - run: node scripts/verify.mjs

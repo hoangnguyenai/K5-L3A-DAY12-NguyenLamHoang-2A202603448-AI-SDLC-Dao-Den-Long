@@ -1,4 +1,5 @@
 import { ISLAND_RADIUS } from './simulation.mjs';
+import { terrainHeight } from './maps.mjs';
 
 const TAU = Math.PI * 2;
 const subtract = (a, b) => a.map((value, index) => value - b[index]);
@@ -38,8 +39,11 @@ const vertexShader = `
   attribute vec3 a_normal;
   uniform mat4 u_projection, u_view;
   uniform vec3 u_origin, u_scale;
+  uniform float u_dawn;
+  uniform vec4 u_lamps[7];
   uniform vec2 u_rotation;
   varying vec3 v_world, v_normal;
+  varying vec3 v_light;
   varying float v_depth;
   vec3 rotate(vec3 p) {
     return vec3(p.x * u_rotation.x + p.z * u_rotation.y, p.y,
@@ -51,6 +55,21 @@ const vertexShader = `
     vec4 view = u_view * vec4(v_world, 1.0);
     v_depth = -view.z;
     gl_Position = u_projection * view;
+    vec3 normal = normalize(v_normal);
+    float moon = max(0.0, dot(normal, normalize(vec3(-0.5, 0.9, -0.35))));
+    v_light = vec3(0.15 + 0.55 * u_dawn) + moon * vec3(0.25, 0.29, 0.36);
+    for (int i = 0; i < 7; i++) {
+      if (u_lamps[i].w > 0.0) {
+        vec3 delta = u_lamps[i].xyz - v_world;
+        float squaredDistance = dot(delta, delta);
+        if (squaredDistance < 169.0) {
+          float reach = 1.0 - sqrt(squaredDistance) / 13.0;
+          float facing = 0.5 + 0.5 * max(0.0, dot(normal, normalize(delta + vec3(0.001))));
+          v_light += reach * reach * facing * vec3(1.3, 0.73, 0.23);
+        }
+      }
+    }
+
   }
 `;
 
@@ -58,22 +77,14 @@ const fragmentShader = `
   precision mediump float;
   uniform vec3 u_color;
   uniform float u_emission, u_dawn;
-  uniform vec4 u_lamps[5];
+  uniform vec4 u_lamps[7];
   varying vec3 v_world, v_normal;
+  varying vec3 v_light;
   varying float v_depth;
   void main() {
-    vec3 normal = normalize(v_normal);
-    float moon = max(0.0, dot(normal, normalize(vec3(-0.5, 0.9, -0.35))));
-    vec3 light = vec3(0.41, 0.47, 0.68) + moon * vec3(0.4, 0.44, 0.5) + u_dawn * vec3(0.23, 0.18, 0.1);
-    for (int i = 0; i < 5; i++) {
-      vec3 delta = u_lamps[i].xyz - v_world;
-      float reach = max(0.0, 1.0 - length(delta) / 13.0);
-      float facing = 0.5 + 0.5 * max(0.0, dot(normal, normalize(delta + vec3(0.001))));
-      light += u_lamps[i].w * reach * reach * facing * vec3(1.3, 0.73, 0.23);
-    }
-    vec3 base = u_color * light + (u_color * 0.8 + vec3(0.15)) * u_emission;
+    vec3 base = u_color * v_light + (u_color * 0.8 + vec3(0.15)) * u_emission;
     float fog = smoothstep(19.0, 76.0, v_depth);
-    vec3 fogColor = mix(vec3(0.13, 0.16, 0.28), vec3(0.32, 0.24, 0.42), u_dawn);
+    vec3 fogColor = vec3(0.106, 0.137, 0.314);
     gl_FragColor = vec4(mix(base, fogColor, fog * (1.0 - u_emission * 0.50)), 1.0);
   }
 `;
@@ -119,18 +130,20 @@ function meshFor(gl, vertices) {
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-  return { buffer, count: vertices.length / 6 };
+  return { buffer, count: vertices.length / 6, vertices };
 }
 
+const rgb = (hex) => [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255);
 const palette = {
-  grass: [0.19, 0.34, 0.31], cliff: [0.29, 0.26, 0.41], trail: [0.33, 0.38, 0.35],
-  rock: [0.34, 0.37, 0.49], bark: [0.28, 0.22, 0.31], pine: [0.15, 0.29, 0.31],
-  pineTop: [0.22, 0.42, 0.40], mint: [0.39, 0.66, 0.56], moon: [0.73, 0.80, 0.92],
-  gold: [1, 0.65, 0.23], whiteGold: [1, 0.88, 0.56], oldGold: [0.62, 0.44, 0.31],
-  bronze: [0.44, 0.27, 0.24], glass: [0.32, 0.25, 0.35], plum: [0.18, 0.10, 0.27],
-  violet: [0.59, 0.33, 0.86], hudViolet: [0.57, 0.59, 0.89],
-  cloak: [0.71, 0.26, 0.17], sash: [0.33, 0.52, 0.53], skin: [0.94, 0.63, 0.47],
+  grass: rgb('#2F5D50'), cliff: rgb('#12384A'), trail: rgb('#C9B48A'),
+  rock: rgb('#5B5F6E'), bark: rgb('#6B4A2F'), pine: rgb('#2F5D50'),
+  pineTop: rgb('#2F5D50'), mint: rgb('#8FA3B8'), moon: rgb('#FFE9B0'),
+  gold: rgb('#FFB347'), whiteGold: rgb('#FFF6C2'), oldGold: rgb('#F2C14E'),
+  bronze: rgb('#6B4A2F'), glass: rgb('#5B5F6E'), plum: rgb('#120A1A'),
+  violet: rgb('#7A3CFF'), hudViolet: rgb('#FFE58A'), stunned: rgb('#3A3450'),
+  cloak: rgb('#E8E2D0'), sash: rgb('#C8102E'), skin: [0.94, 0.63, 0.47],
   straw: [0.91, 0.65, 0.31], boot: [0.23, 0.16, 0.22], shadow: [0.11, 0.21, 0.23],
+  drifter: rgb('#8FA3B8'),
 };
 
 function scenery() {
@@ -156,7 +169,7 @@ function scenery() {
 export class Scene {
   constructor(canvas) {
     this.canvas = canvas;
-    const gl = canvas.getContext('webgl', { alpha: true, antialias: true });
+    const gl = canvas.getContext('webgl', { alpha: true, antialias: false });
     if (!gl) throw new Error('Trình duyệt cần bật WebGL để hiển thị đảo.');
     this.gl = gl;
     const program = programFor(gl);
@@ -172,7 +185,7 @@ export class Scene {
     gl.enableVertexAttribArray(this.position);
     gl.enableVertexAttribArray(this.normal);
     this.meshes = {
-      disc: meshFor(gl, lathe([[1, 0], [0, 0]], 56)),
+      disc: meshFor(gl, lathe(Array.from({ length: 9 }, (_, index) => [1 - index / 8, 0]), 48)),
       cliff: meshFor(gl, lathe([[0, -6], [0.64, -4], [0.88, -2], [1, 0]], 28)),
       sphere: meshFor(gl, lathe([[0, -1], [0.71, -0.71], [1, 0], [0.71, 0.71], [0, 1]], 12)),
       diamond: meshFor(gl, lathe([[0, -1], [1, 0], [0, 1]], 5)),
@@ -187,6 +200,24 @@ export class Scene {
     const gl = this.gl;
     const { location } = this;
     const geometry = this.meshes[mesh];
+    if (this.recording) {
+      const key = color.join(',') + ':' + emission;
+      let batch = this.recording.get(key);
+      if (!batch) {
+        batch = { color, emission, vertices: [] };
+        this.recording.set(key, batch);
+      }
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      const values = geometry.vertices;
+      for (let i = 0; i < values.length; i += 6) {
+        const x = values[i] * scale[0], y = values[i + 1] * scale[1], z = values[i + 2] * scale[2];
+        const normal = normalize([values[i + 3] / scale[0], values[i + 4] / scale[1], values[i + 5] / scale[2]]);
+        batch.vertices.push(x * cos + z * sin + origin[0], y + origin[1], -x * sin + z * cos + origin[2],
+          normal[0] * cos + normal[2] * sin, normal[1], -normal[0] * sin + normal[2] * cos);
+      }
+      return;
+    }
     if (geometry !== this.lastMesh) {
       gl.bindBuffer(gl.ARRAY_BUFFER, geometry.buffer);
       gl.vertexAttribPointer(this.position, 3, gl.FLOAT, false, 24, 0);
@@ -217,26 +248,48 @@ export class Scene {
     const orbit = preview ? 0.48 + Math.sin(time * 0.18) * 0.12 : yaw;
     const cameraDistance = preview ? 37 : 11.5;
     const cameraHeight = preview ? 24 : 7.2;
-    const eye = [x - Math.sin(orbit) * cameraDistance, y * 0.3 + cameraHeight, z - Math.cos(orbit) * cameraDistance];
-    const target = [x + Math.sin(orbit) * 3, 1.6 + y * 0.4, z + Math.cos(orbit) * 3];
-    gl.uniformMatrix4fv(location.projection, false, perspective(width / height));
-    gl.uniformMatrix4fv(location.view, false, lookAt(eye, target));
-    gl.uniform1f(location.dawn, night.lanterns.filter((lantern) => lantern.lit).length / 5);
-    gl.uniform4fv(location['lamps[0]'], night.lanterns.flatMap(({ pos, lit }) => [pos[0], pos[1] + 3, pos[2], lit ? 1 : 0]));
+    const eye = [x - Math.sin(orbit) * cameraDistance, y + cameraHeight, z - Math.cos(orbit) * cameraDistance];
+    const target = [x + Math.sin(orbit) * 3, 1.6 + y, z + Math.cos(orbit) * 3];
+    this.projection = perspective(width / height);
+    this.view = lookAt(eye, target);
+    gl.uniformMatrix4fv(location.projection, false, this.projection);
+    gl.uniformMatrix4fv(location.view, false, this.view);
+    gl.uniform1f(location.dawn, night.lanterns.filter((lantern) => lantern.lit).length / night.lanterns.length);
+    gl.uniform4fv(location['lamps[0]'], Array.from({ length: 7 }, (_, index) => {
+      const lamp = night.lanterns[index];
+      return lamp ? [lamp.pos[0], lamp.pos[1] + 3, lamp.pos[2], Number(lamp.lit)] : [0, 0, 0, 0];
+    }).flat());
 
-    this.draw('cliff', [0, -0.08, 0], [ISLAND_RADIUS, 1.7, ISLAND_RADIUS], palette.cliff);
-    this.draw('disc', [0, 0, 0], [ISLAND_RADIUS, 1, ISLAND_RADIUS], palette.grass);
+    if (this.cachedNight !== night.night) {
+      for (const batch of this.staticBatches ?? []) gl.deleteBuffer(this.meshes[batch.key].buffer);
+      this.recording = new Map();
+    this.terrain(night);
     this.draw('disc', [0, 0.012, 0], [4.6, 1, 4.6], palette.trail);
-    for (const { type, x: px, z: pz, size } of this.scenery) {
-      if (Math.hypot(px - x, pz - z) > 54 && !preview) continue;
+    const objects = night.map.centers.flatMap((center) => this.scenery.map((object) => ({ ...object,
+      x: center + object.x * night.map.radius / 40, z: object.z * night.map.radius / 40,
+    })));
+    for (const { type, x: px, z: pz, size } of objects) {
+      const ground = terrainHeight(night.night, px, pz);
       if (type === 'tree') {
-        this.draw('cylinder', [px, 0, pz], [0.19 * size, 2.55 * size, 0.19 * size], palette.bark);
-        this.draw('cone', [px, 1.5 * size, pz], [1.6 * size, 3.3 * size, 1.6 * size], palette.pine, px);
-        this.draw('cone', [px, 2.65 * size, pz], [1.17 * size, 2.7 * size, 1.17 * size], palette.pineTop, px);
+        this.draw('cylinder', [px, ground, pz], [0.19 * size, 2.55 * size, 0.19 * size], palette.bark);
+        this.draw('cone', [px, ground + 1.5 * size, pz], [1.6 * size, 3.3 * size, 1.6 * size], palette.pine, px);
+        this.draw('cone', [px, ground + 2.65 * size, pz], [1.17 * size, 2.7 * size, 1.17 * size], palette.pineTop, px);
       } else {
-        this.draw('sphere', [px, 0.16 * size, pz], [size, size * 0.52, size * 0.74], palette.rock, px);
-        if (px > 0) this.draw('diamond', [px + size, 0.45 * size, pz], [0.16, 0.49 * size, 0.16], palette.mint, pz, 0.24);
+        this.draw('sphere', [px, ground + 0.16 * size, pz], [size, size * 0.52, size * 0.74], palette.rock, px);
+        if (px > 0) this.draw('diamond', [px + size, ground + 0.45 * size, pz], [0.16, 0.49 * size, 0.16], palette.mint, pz, 0.24);
       }
+    }
+
+      this.staticBatches = [...this.recording.values()].map((batch, index) => {
+        const key = 'static' + index;
+        this.meshes[key] = meshFor(gl, batch.vertices);
+        return { key, color: batch.color, emission: batch.emission };
+      });
+      this.recording = null;
+      this.cachedNight = night.night;
+    }
+    for (const batch of this.staticBatches) {
+      this.draw(batch.key, [0, 0, 0], [1, 1, 1], batch.color, 0, batch.emission);
     }
     for (const lantern of night.lanterns) this.lantern(lantern, time);
     for (const { pos, id } of night.motes) {
@@ -247,7 +300,31 @@ export class Scene {
         [0.045, 0.045, 0.045], palette.gold, 0, 0.8);
     }
     for (const shade of night.shades) this.shade(shade, night.player.pos, time);
+    for (const drifter of night.drifters) {
+      const [dx, dy, dz] = drifter.pos;
+      this.draw('sphere', [dx, dy + Math.sin(time * 5) * 0.2, dz], [0.35, 0.2, 1.6], palette.drifter, time * 0.7, 0.3);
+    }
+    for (const charm of night.charms) {
+      if (charm.available) {
+        this.draw('diamond', [charm.pos[0], charm.pos[1] + 0.9, charm.pos[2]], [0.48, 0.7, 0.16], palette.gold, time, 0.3);
+        this.draw('diamond', [charm.pos[0], charm.pos[1] + 0.9, charm.pos[2]], [0.35, 0.55, 0.19], palette.sash, time, 0.35);
+      }
+    }
     this.hero(night, time);
+    if (this.pickupEffect) {
+      const age = time - this.pickupEffect.time;
+      if (age >= 0 && age < 0.6) {
+        const [px, py, pz] = this.pickupEffect.pos;
+        const progress = age / 0.6;
+        for (let index = 0; index < 8; index++) {
+          const angle = index * TAU / 8 + age * 5;
+          const radius = (1 - progress) * 0.9 + 0.15;
+          const size = 0.1 * (1 - progress) + 0.025;
+          this.draw('diamond', [px + Math.sin(angle) * radius, py + 0.4 + progress * 1.3, pz + Math.cos(angle) * radius],
+            [size, size * 1.8, size], palette.whiteGold, angle, 1);
+        }
+      } else this.pickupEffect = null;
+    }
     if (pulseAge < 0.36) {
       const radius = 0.5 + pulseAge / 0.36 * (night.tuning.pulse_radius - 0.5);
       for (let index = 0; index < 32; index++) {
@@ -258,8 +335,68 @@ export class Scene {
     }
   }
 
+  pickup(pos, time) {
+    this.pickupEffect = { pos: [...pos], time };
+  }
+
+  isOnScreen(pos) {
+    if (!this.view) return true;
+    const [x, y, z] = pos;
+    const m = this.view;
+    const vx = m[0] * x + m[4] * y + m[8] * z + m[12];
+    const vy = m[1] * x + m[5] * y + m[9] * z + m[13];
+    const vz = m[2] * x + m[6] * y + m[10] * z + m[14];
+    return vz < -0.2 && Math.abs(vx * this.projection[0] / -vz) <= 1
+      && Math.abs(vy * this.projection[5] / -vz) <= 1;
+  }
+
+  terrain(night) {
+    const map = night.map;
+    for (const center of map.centers) {
+      this.draw('cliff', [center, -0.08, 0], [map.radius, 1.7, map.radius], palette.cliff);
+      this.draw('disc', [center, 0, 0], [map.radius, 1, map.radius], palette.grass);
+    }
+    if (night.night === 2) {
+      for (let x = 26; x <= 44; x += 0.55) {
+        this.draw('cylinder', [x, -0.16, 0], [0.32, 0.16, 2], palette.bark);
+      }
+    }
+    if (night.night === 3) {
+      for (let index = 0; index < 32; index++) {
+        const a = index * Math.PI / 32;
+        const b = (index + 1) * Math.PI / 32;
+        const p = (r, angle, y) => [r * Math.cos(angle), y, r * Math.sin(angle)];
+        const data = [];
+        addTriangle(data, p(12, a, 3), p(24, b, 3), p(24, a, 3));
+        addTriangle(data, p(12, a, 3), p(12, b, 3), p(24, b, 3));
+        addTriangle(data, p(24, a, 0), p(24, b, 0), p(24, b, 3));
+        addTriangle(data, p(24, a, 0), p(24, b, 3), p(24, a, 3));
+        const key = 'terrace' + index;
+        if (!this.meshes[key]) this.meshes[key] = meshFor(this.gl, data);
+        this.draw(key, [0, 0, 0], [1, 1, 1], palette.grass);
+      }
+      this.draw('cylinder', [0, 0, 0], [8, 6, 8], palette.rock);
+      this.draw('disc', [0, 6.01, 0], [8, 1, 8], palette.grass);
+      this.draw('cylinder', [0, 6, 0], [2, 8, 2], palette.bark);
+      this.draw('sphere', [0, 13, 0], [1.6, 1, 1.6], palette.gold);
+      for (const angle of [Math.PI / 6, 5 * Math.PI / 6]) {
+        const data = [];
+        const p = (r, side, y) => [r * Math.cos(angle) - side * Math.sin(angle), y, r * Math.sin(angle) + side * Math.cos(angle)];
+        addTriangle(data, p(30, -1.5, 0), p(24, 1.5, 3), p(30, 1.5, 0));
+        addTriangle(data, p(30, -1.5, 0), p(24, -1.5, 3), p(24, 1.5, 3));
+        const key = 'ramp' + angle;
+        if (!this.meshes[key]) this.meshes[key] = meshFor(this.gl, data);
+        this.draw(key, [0, 0.03, 0], [1, 1, 1], palette.trail);
+      }
+    }
+    for (const pad of map.pads) {
+      this.draw('cylinder', pad.pos, [1, 0.15, 1], palette.sash);
+      this.draw('diamond', [pad.pos[0], pad.pos[1] + 0.3, pad.pos[2]], [0.5, 0.2, 0.5], palette.gold, 0, 0.6);
+    }
+  }
+
   lantern({ pos: [x, y, z], lit, deposited }, time) {
-    this.draw('disc', [x, y + 0.014, z], [lit ? 3.2 : 1.8, 1, lit ? 3.2 : 1.8], lit ? palette.oldGold : palette.trail);
+    this.draw('disc', [x, y + 0.014, z], [lit ? 6 : 1.8, 1, lit ? 6 : 1.8], lit ? palette.oldGold : palette.trail);
     this.draw('cylinder', [x, y, z], [1.15, 0.24, 1.15], palette.rock);
     this.draw('cylinder', [x, y + 0.24, z], [0.32, 2.36, 0.32], palette.bronze);
     this.draw('cylinder', [x, y + 2.37, z], [0.75, 0.22, 0.75], palette.oldGold);
@@ -279,8 +416,8 @@ export class Scene {
     const angle = Math.atan2(player[0] - x, player[2] - z);
     const body = Math.max(0.75, y) + Math.sin(time * 4 + x) * 0.13;
     this.draw('disc', [x, 0.018, z], [0.88, 1, 0.88], palette.shadow);
-    this.draw('bell', [x, body - 0.57, z], [0.71, 1.43, 0.66], palette.plum, angle);
-    this.draw('sphere', [x, body + 0.52, z], [0.59, 0.59, 0.58], palette.plum, angle);
+    this.draw('bell', [x, body - 0.57, z], [0.71, 1.43, 0.66], state === 'stunned' ? palette.stunned : palette.plum, angle);
+    this.draw('sphere', [x, body + 0.52, z], [0.59, 0.59, 0.58], state === 'stunned' ? palette.stunned : palette.plum, angle);
     for (const side of [-1, 1]) {
       const px = x + Math.cos(angle) * side * 0.22 + Math.sin(angle) * 0.51;
       const pz = z - Math.sin(angle) * side * 0.22 + Math.cos(angle) * 0.51;

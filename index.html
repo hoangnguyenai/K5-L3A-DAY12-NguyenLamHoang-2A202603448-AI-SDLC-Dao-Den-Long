@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101421">
-  <title>Đảo Đèn Lồng — Đêm 1</title>
+  <title>Đảo Đèn Lồng — Ba hòn đảo</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,26 +14,33 @@
     <div class="vignette" aria-hidden="true"></div>
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>Đảo Đèn Lồng</span></div>
-      <span class="chapter">Đêm 1 <span aria-hidden="true">/</span> Đảo Bến</span>
+      <span class="chapter" id="chapter">Ba hòn đảo</span>
       <button type="button" id="pause" class="plain" hidden>Tạm dừng <kbd>Esc</kbd></button>
     </header>
 
     <section id="intro" class="intro" aria-labelledby="title">
       <p class="eyebrow"><span aria-hidden="true">✧</span> Đêm 1 <span aria-hidden="true">·</span> Đảo Bến</p>
       <h1 id="title">Đảo Đèn Lồng</h1>
-      <p class="intro-copy">Sương đen đã phủ Đảo Bến. Hãy cùng Mây gom đom đóm và thắp lại năm chiếc đèn trước bình minh.</p>
-      <button type="button" class="primary" id="start">Bắt đầu chơi <span aria-hidden="true">→</span></button>
+      <p class="intro-copy">Cùng Mây qua ba hòn đảo, gom đom đóm và thắp lại những chiếc đèn trước bình minh.</p>
+      <button type="button" class="primary" id="start" disabled>Bắt đầu chơi <span aria-hidden="true">→</span></button>
+      <button type="button" class="plain" id="menu-settings">Cài đặt</button>
       <p id="load-error" role="alert" hidden></p>
+    </section>
+
+    <section id="night-intro" class="intro" aria-labelledby="night-name" hidden>
+      <h2 id="night-name"></h2>
+      <p id="night-story" class="intro-copy"></p>
+      <button type="button" id="enter-night" class="primary">Bước vào Đêm</button>
     </section>
 
     <section id="hud" class="hud" aria-label="Trạng thái trò chơi" hidden>
       <div class="hud-top">
         <div class="panel resources">
-          <div><span class="hud-label">Sinh lực</span><strong id="flames" class="flames"></strong></div>
+          <div><span class="hud-label">Ngọn Lửa</span><strong id="flames" class="flames"></strong></div>
           <div><span class="hud-label">Đom đóm</span><strong id="carried" class="resource-value"></strong></div>
-          <div><span class="hud-label">Điểm</span><strong id="score" class="resource-value"></strong></div>
         </div>
         <div class="panel objective">
+          <div class="objective-line"><span class="hud-label">Điểm</span><strong id="score" class="resource-value"></strong></div>
           <div class="objective-line"><span class="hud-label">Đèn đã thắp</span><strong id="lantern-count"></strong></div>
           <div id="lantern-pips" class="pips" aria-hidden="true"></div>
           <div class="objective-line"><span class="hud-label">Đến bình minh</span><time id="clock"></time></div>
@@ -41,6 +48,10 @@
         </div>
       </div>
       <div class="feedback" aria-live="polite"><span id="notice" hidden></span><span id="prompt" hidden></span></div>
+      <div id="mote-bar" class="mote-bar" aria-label="Đom đóm đang mang"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="cooldowns"><span id="dash-status"></span><span id="pulse-status"></span></div>
+      <span id="direction" class="direction" hidden></span>
+      <span id="wind-notice" class="wind-notice" hidden></span>
     </section>
 
     <section id="overlay" class="overlay" aria-labelledby="overlay-title" hidden>
@@ -49,13 +60,29 @@
         <h2 id="overlay-title"></h2>
         <p id="overlay-description"></p>
         <button type="button" id="overlay-action" class="primary"></button>
+        <div id="pause-options" class="pause-options" hidden>
+          <button type="button" id="restart-night" class="plain">Chơi lại Đêm</button>
+          <button type="button" id="pause-settings" class="plain">Cài đặt</button>
+          <button type="button" id="back-menu" class="plain">Về menu</button>
+        </div>
       </div>
     </section>
+
+    <dialog id="settings" class="dialog panel" aria-labelledby="settings-title">
+      <h2 id="settings-title">Cài đặt</h2>
+      <label class="setting" for="volume">Âm lượng <output id="volume-value"></output></label>
+      <input id="volume" type="range" min="0" max="1" step="0.05">
+      <label class="setting" for="sensitivity">Độ nhạy chuột <output id="sensitivity-value"></output></label>
+      <input id="sensitivity" type="range" min="0.25" max="2" step="0.05">
+      <p id="settings-status" role="status"></p>
+      <form method="dialog"><button class="primary" type="submit">Đóng</button></form>
+    </dialog>
 
     <footer class="footer">
       <div class="keys" aria-label="Điều khiển">
         <span><kbd>W A S D</kbd> Di chuyển</span>
         <span><kbd>Space</kbd> Nhảy</span>
+        <span><kbd>Shift</kbd> Lướt</span>
         <span><kbd>Q</kbd> <kbd>R</kbd> Xoay góc nhìn</span>
         <span><kbd>E</kbd> Nạp đèn</span>
         <span><kbd>F</kbd> Tỏa sáng</span>
@@ -69,6 +96,7 @@
         </div>
         <div class="actions">
           <button type="button" data-key="Space">Nhảy</button>
+          <button type="button" data-key="ShiftLeft">Lướt</button>
           <button type="button" data-key="KeyE">Nạp đèn</button>
           <button type="button" data-key="KeyF">Tỏa sáng</button>
         </div>
