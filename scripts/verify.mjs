@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 import os from 'node:os';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const proof = join(root, 'docs', 'phase-3', 'proof');
+const proof = join(root, 'docs', 'phase-4', 'proof');
 mkdirSync(proof, { recursive: true });
 function run(script, args = []) {
   const result = spawnSync(process.execPath, [...process.execArgv, script, ...args], {
@@ -16,7 +16,7 @@ function run(script, args = []) {
   return result.stdout;
 }
 run('scripts/build.mjs');
-for (const phase of [1, 2, 3]) {
+for (const phase of [1, 2, 3, 4]) {
   const output = run(`tests/phase-${phase}.mjs`);
   writeFileSync(join(proof, `phase-${phase}.tap`), output);
   console.log(`Phase ${phase}: kiểm thử đạt.`);

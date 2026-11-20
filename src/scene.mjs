@@ -38,20 +38,20 @@ const vertexShader = `
   attribute vec3 a_position;
   attribute vec3 a_normal;
   uniform mat4 u_projection, u_view;
-  uniform vec3 u_origin, u_scale;
+  attribute vec3 a_origin, a_scale;
   uniform float u_dawn;
   uniform vec4 u_lamps[7];
-  uniform vec2 u_rotation;
+  attribute vec2 a_rotation;
   varying vec3 v_world, v_normal;
   varying vec3 v_light;
   varying float v_depth;
   vec3 rotate(vec3 p) {
-    return vec3(p.x * u_rotation.x + p.z * u_rotation.y, p.y,
-      -p.x * u_rotation.y + p.z * u_rotation.x);
+    return vec3(p.x * a_rotation.x + p.z * a_rotation.y, p.y,
+      -p.x * a_rotation.y + p.z * a_rotation.x);
   }
   void main() {
-    v_world = rotate(a_position * u_scale) + u_origin;
-    v_normal = normalize(rotate(a_normal / u_scale));
+    v_world = rotate(a_position * a_scale) + a_origin;
+    v_normal = normalize(rotate(a_normal / a_scale));
     vec4 view = u_view * vec4(v_world, 1.0);
     v_depth = -view.z;
     gl_Position = u_projection * view;
@@ -180,12 +180,18 @@ export class Scene {
     for (const key of ['projection', 'view', 'origin', 'scale', 'rotation', 'color', 'emission', 'dawn', 'lamps[0]']) {
       this.location[key] = gl.getUniformLocation(program, `u_${key}`);
     }
+    this.instancing = gl.getExtension('ANGLE_instanced_arrays');
+    this.instanceBuffer = gl.createBuffer();
+    for (const key of ['origin', 'scale', 'rotation']) this.location[key] = gl.getAttribLocation(program, 'a_' + key);
     this.position = gl.getAttribLocation(program, 'a_position');
     this.normal = gl.getAttribLocation(program, 'a_normal');
     gl.enableVertexAttribArray(this.position);
     gl.enableVertexAttribArray(this.normal);
     this.meshes = {
       disc: meshFor(gl, lathe(Array.from({ length: 9 }, (_, index) => [1 - index / 8, 0]), 48)),
+      distantBody: meshFor(gl, lathe([[0,0],[1,0],[.74,.50],[.22,1],[0,1]],6)),
+      distantHead: meshFor(gl, lathe([[0,-1],[1,0],[0,1]],7)),
+      shadow: meshFor(gl, lathe([[1, 0], [0, 0]], 16)),
       cliff: meshFor(gl, lathe([[0, -6], [0.64, -4], [0.88, -2], [1, 0]], 28)),
       sphere: meshFor(gl, lathe([[0, -1], [0.71, -0.71], [1, 0], [0.71, 0.71], [0, 1]], 12)),
       diamond: meshFor(gl, lathe([[0, -1], [1, 0], [0, 1]], 5)),
@@ -200,6 +206,16 @@ export class Scene {
     const gl = this.gl;
     const { location } = this;
     const geometry = this.meshes[mesh];
+    if (this.instances) {
+      const key = mesh + '/' + color.join(',') + '/' + emission;
+      let batch = this.instances.get(key);
+      if (!batch) {
+        batch = { geometry, color, emission, instances: [] };
+        this.instances.set(key, batch);
+      }
+      batch.instances.push(...origin, ...scale, Math.cos(rotation), Math.sin(rotation));
+      return;
+    }
     if (this.recording) {
       const key = color.join(',') + ':' + emission;
       let batch = this.recording.get(key);
@@ -224,15 +240,40 @@ export class Scene {
       gl.vertexAttribPointer(this.normal, 3, gl.FLOAT, false, 24, 12);
       this.lastMesh = geometry;
     }
-    gl.uniform3fv(location.origin, origin);
-    gl.uniform3fv(location.scale, scale);
-    gl.uniform2f(location.rotation, Math.cos(rotation), Math.sin(rotation));
+    gl.vertexAttrib3fv(location.origin, origin);
+    gl.vertexAttrib3fv(location.scale, scale);
+    gl.vertexAttrib2f(location.rotation, Math.cos(rotation), Math.sin(rotation));
     gl.uniform3fv(location.color, color);
     gl.uniform1f(location.emission, emission);
     gl.drawArrays(gl.TRIANGLES, 0, geometry.count);
   }
 
-  render(night, yaw, time, pulseAge, preview) {
+  flushInstances() {
+    const {gl, location, instancing} = this;
+    for (const {geometry, color, emission, instances} of this.instances.values()) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(instances), gl.STREAM_DRAW);
+      for (const [attribute, size, offset] of [[location.origin,3,0],[location.scale,3,12],[location.rotation,2,24]]) {
+        gl.enableVertexAttribArray(attribute);
+        gl.vertexAttribPointer(attribute,size,gl.FLOAT,false,32,offset);
+        instancing.vertexAttribDivisorANGLE(attribute,1);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, geometry.buffer);
+      gl.vertexAttribPointer(this.position,3,gl.FLOAT,false,24,0);
+      gl.vertexAttribPointer(this.normal,3,gl.FLOAT,false,24,12);
+      gl.uniform3fv(location.color,color);
+      gl.uniform1f(location.emission,emission);
+      instancing.drawArraysInstancedANGLE(gl.TRIANGLES,0,geometry.count,instances.length/8);
+    }
+    for (const attribute of [location.origin,location.scale,location.rotation]) {
+      gl.disableVertexAttribArray(attribute);
+      instancing.vertexAttribDivisorANGLE(attribute,0);
+    }
+    this.instances = null;
+    this.lastMesh = null;
+  }
+
+  render(night, yaw, time, pulseAge, preview, camera) {
     const { canvas, gl, location } = this;
     const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
     const width = Math.round(canvas.clientWidth * ratio);
@@ -245,13 +286,14 @@ export class Scene {
     }
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const [x, y, z] = night.player.pos;
-    const orbit = preview ? 0.48 + Math.sin(time * 0.18) * 0.12 : yaw;
+    const orbit = preview ? 0.48 + (this.reduced ? 0 : Math.sin(time * 0.18) * 0.12) : yaw;
     const cameraDistance = preview ? 37 : 11.5;
     const cameraHeight = preview ? 24 : 7.2;
-    this.orbit = orbit;
-    const eye = [x - Math.sin(orbit) * cameraDistance, y + cameraHeight, z - Math.cos(orbit) * cameraDistance];
-    const target = [x + Math.sin(orbit) * 3, 1.6 + y, z + Math.cos(orbit) * 3];
+    this.orbit = camera ? Math.atan2(-camera.eye[0],-camera.eye[2]) : orbit;
+    const eye = camera?.eye ?? [x - Math.sin(orbit) * cameraDistance, y + cameraHeight, z - Math.cos(orbit) * cameraDistance];
+    const target = camera?.target ?? [x + Math.sin(orbit) * 3, 1.6 + y, z + Math.cos(orbit) * 3];
     this.projection = perspective(width / height);
+    this.eye = eye;
     this.view = lookAt(eye, target);
     gl.uniformMatrix4fv(location.projection, false, this.projection);
     gl.uniformMatrix4fv(location.view, false, this.view);
@@ -293,14 +335,19 @@ export class Scene {
       this.draw(batch.key, [0, 0, 0], [1, 1, 1], batch.color, 0, batch.emission);
     }
     for (const lantern of night.lanterns) this.lantern(lantern, time);
+    if (this.instancing) this.instances = new Map();
     for (const { pos, id } of night.motes) {
+      if (!this.isOnScreen(pos,2)) continue;
       const phase = time * 3 + Number(id.slice(1));
       this.draw('diamond', [pos[0], pos[1] + 0.72 + Math.sin(phase) * 0.2, pos[2]],
         [0.17, 0.25, 0.17], palette.whiteGold, time * 1.8, 1);
       this.draw('sphere', [pos[0] + 0.27, pos[1] + 0.81 + Math.cos(phase) * 0.26, pos[2] - 0.2],
         [0.045, 0.045, 0.045], palette.gold, 0, 0.8);
     }
-    for (const shade of night.shades) this.shade(shade, night.player.pos, time);
+    for (const shade of night.shades) {
+      if (this.isOnScreen(shade.pos,3)) this.shade(shade, night.player.pos, time);
+    }
+    if (this.instances) this.flushInstances();
     for (const drifter of night.drifters) {
       const [dx, dy, dz] = drifter.pos;
       this.draw('sphere', [dx, dy + Math.sin(time * 5) * 0.2, dz], [0.35, 0.2, 1.6], palette.drifter, time * 0.7, 0.3);
@@ -326,7 +373,7 @@ export class Scene {
         }
       } else this.pickupEffect = null;
     }
-    if (pulseAge < 0.36) {
+    if (!this.reduced && pulseAge < 0.36) {
       const radius = 0.5 + pulseAge / 0.36 * (night.tuning.pulse_radius - 0.5);
       for (let index = 0; index < 32; index++) {
         const angle = index * TAU / 32;
@@ -340,15 +387,15 @@ export class Scene {
     this.pickupEffect = { pos: [...pos], time };
   }
 
-  isOnScreen(pos) {
+  isOnScreen(pos, margin = 0) {
     if (!this.view) return true;
     const [x, y, z] = pos;
     const m = this.view;
     const vx = m[0] * x + m[4] * y + m[8] * z + m[12];
     const vy = m[1] * x + m[5] * y + m[9] * z + m[13];
     const vz = m[2] * x + m[6] * y + m[10] * z + m[14];
-    return vz < -0.2 && Math.abs(vx * this.projection[0] / -vz) <= 1
-      && Math.abs(vy * this.projection[5] / -vz) <= 1;
+    return vz < margin - 0.2 && Math.abs(vx * this.projection[0]) <= -vz + 3 * margin
+      && Math.abs(vy * this.projection[5]) <= -vz + 3 * margin;
   }
 
   terrain(night) {
@@ -398,7 +445,7 @@ export class Scene {
 
   lantern({ pos: [x, y, z], lit, deposited, fuelUnits }, time) {
     const fuel = fuelUnits / 60;
-    const glow = fuel < 30 ? 0.55 + 0.35 * Math.cos(TAU * time) : 0.9;
+    const glow = fuel < 30 && !this.reduced ? 0.55 + 0.35 * Math.cos(TAU * time) : 0.9;
     const radius = lit && fuel >= 30 ? 6 : 1.8;
     this.draw('disc', [x, y + 0.014, z], [radius, 1, radius], lit ? palette.oldGold : palette.trail);
     this.draw('cylinder', [x, y, z], [1.15, 0.24, 1.15], palette.rock);
@@ -431,24 +478,25 @@ export class Scene {
 
   shade({ pos: [x, y, z], state }, player, time) {
     const angle = Math.atan2(player[0] - x, player[2] - z);
+    const distant = Math.hypot(x-this.eye[0], y-this.eye[1], z-this.eye[2]) > 16;
     const outline = this.accessibleColors ? rgb('#00B3FF') : palette.violet;
     const body = Math.max(0.75, y) + Math.sin(time * 4 + x) * 0.13;
-    this.draw('disc', [x, 0.018, z], [0.88, 1, 0.88], palette.shadow);
+    this.draw('shadow', [x, 0.018, z], [0.88, 1, 0.88], palette.shadow);
     this.draw('cylinder', [x, body - 0.58, z], [0.72, 0.07, 0.67], outline, angle, 0.55);
-    this.draw('bell', [x, body - 0.57, z], [0.71, 1.43, 0.66], state === 'stunned' ? palette.stunned : palette.plum, angle);
-    this.draw('sphere', [x, body + 0.52, z], [0.59, 0.59, 0.58], state === 'stunned' ? palette.stunned : palette.plum, angle);
+    this.draw(distant ? 'distantBody' : 'bell', [x, body - 0.57, z], [0.71, 1.43, 0.66], state === 'stunned' ? palette.stunned : palette.plum, angle);
+    this.draw(distant ? 'distantHead' : 'sphere', [x, body + 0.52, z], [0.59, 0.59, 0.58], state === 'stunned' ? palette.stunned : palette.plum, angle);
     for (const side of [-1, 1]) {
       const px = x + Math.cos(angle) * side * 0.22 + Math.sin(angle) * 0.51;
       const pz = z - Math.sin(angle) * side * 0.22 + Math.cos(angle) * 0.51;
-      this.draw('sphere', [px, body + 0.55, pz], [0.117, 0.08, 0.10], outline, angle, 0.85);
+      this.draw(distant ? 'diamond' : 'sphere', [px, body + 0.55, pz], [0.117, 0.08, 0.10], outline, angle, 0.85);
     }
     if (state === 'stunned') this.draw('diamond', [x, body + 1.52, z], [0.17, 0.24, 0.17], palette.whiteGold, time * 2, 0.8);
   }
 
   hero(night, time) {
     const { pos: [x, y, z], heading, invulnerableUntil } = night.player;
-    this.draw('disc', [x, 0.021, z], [0.62, 1, 0.62], palette.shadow);
-    if (night.tick < invulnerableUntil && Math.floor(time * 13) % 2) return;
+    this.draw('shadow', [x, 0.021, z], [0.62, 1, 0.62], palette.shadow);
+    if (!this.reduced && night.tick < invulnerableUntil && Math.floor(time * 13) % 2) return;
     const local = (px, py, pz) => [x + Math.cos(heading) * px + Math.sin(heading) * pz, y + py,
       z - Math.sin(heading) * px + Math.cos(heading) * pz];
     const walking = Math.hypot(...night.previousInput.move) > 0 && y < 0.05;

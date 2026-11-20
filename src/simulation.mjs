@@ -5,7 +5,8 @@ const DT = 1 / TICK_RATE;
 const EPS = 1e-8;
 const round = (value) => Math.round(value * 1000) / 1000;
 const position = (pos) => pos.map(round);
-const order = (a, b) => a.id.localeCompare(b.id, 'en', { numeric: true });
+const idOrder = new Intl.Collator('en', { numeric: true });
+const order = (a, b) => idOrder.compare(a.id, b.id);
 export const initialInput = () => ({ move: [0, 0], cam_yaw_deg: 0, jump: false, interact: false, pulse: false, dash: false, pause: false });
 const counters = (object, keys) => { for (const key of keys) object[key] = Math.max(0, object[key] - 1); };
 
@@ -347,7 +348,7 @@ export class Night {
     shade.pos = [next[0], floor + 0.8, next[2]];
   }
 
-  moveShades() {
+  moveShades(wanderOnly = false) {
     for (const shade of this.shades) {
       if (shade.state === 'drain') {
         const lamp = this.lanterns.find((item) => item.id === shade.target);
@@ -379,7 +380,7 @@ export class Night {
         shade.state = 'wander';
       }
       const range = distance(shade.pos, this.player.pos);
-      if (range <= 12) shade.state = 'chase';
+      if (!wanderOnly && range <= 12) shade.state = 'chase';
       if (range > 18) shade.state = 'wander';
       let target;
       let direction;

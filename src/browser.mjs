@@ -2,7 +2,9 @@ import { initialInput, ISLAND_RADIUS, Night, TICK_RATE } from './simulation.mjs'
 import { Scene } from './scene.mjs';
 import { GameAudio } from './audio.mjs';
 import { loadSettings, saveSettings } from './settings.mjs';
-import { mapFor } from './maps.mjs';
+import { bindAccess } from './accessibility.mjs';
+import { initRanking } from './ranking.mjs';
+let access, setScoreForm, shadeWarning;
 
 const byId = (id) => document.getElementById(id);
 const ui = Object.fromEntries([
@@ -51,6 +53,7 @@ const nightStories = [
 
 function setMode(next) {
   mode = next;
+  setScoreForm?.(null);
   ui.game.dataset.mode = next;
   ui.intro.hidden = next !== 'menu';
   ui['night-intro'].hidden = next !== 'introduction';
@@ -79,6 +82,7 @@ function start() {
   noticeUntil = 0;
   lastCountdown = undefined;
   windWasWarning = false;
+  shadeWarning = null;
   ui.notice.hidden = true;
   setMode('playing');
   updateHud(performance.now());
@@ -120,6 +124,7 @@ function end(reason) {
     no_flames: 'Mây đã cạn sinh lực. Hãy tìm nơi an toàn quanh những chiếc đèn sáng.',
   };
   if (won) totalScore += night.score;
+  if (!won || currentNight === 3) setScoreForm({score:totalScore,nights_won:won ? 3 : currentNight-1,seed:42});
   overlay(won ? 'Chiến thắng' : `Kết thúc Đêm ${currentNight}`,
     won ? (currentNight === 3 ? 'Bình Minh' : `${night.map.name} bừng sáng`) : 'Ánh sáng đã tắt',
     `${won ? 'Mây đã giữ đảo sáng đến bình minh.' : detail[reason]} Điểm Đêm: ${night.score}. Tổng điểm các Đêm đã thắng: ${totalScore}.`,
@@ -167,6 +172,7 @@ function advance(now) {
   for (const { name, data } of events) {
     audio.effect(name === 'game_over' ? data.result : name);
     switch (name) {
+      case 'shade_spawned': shadeWarning = { pos: [...night.shades.find(s=>s.id===data.id).pos], until:now+2500 }; break;
       case 'mote_picked':
         pickupUntil = now + 600;
         scene.pickup(night.player.pos, now / 1000);
@@ -209,6 +215,16 @@ function updateHud(now) {
     pip.classList.toggle('lit', night.lanterns[index].lit);
   }
   const remaining = Math.ceil(night.timeLeft);
+  const weak = night.lanterns.filter(lamp=>lamp.lit && lamp.fuelUnits < 1800).map(lamp=>lamp.id);
+  byId('captions').textContent = [remaining <= 10 ? 'Bình minh trong '+remaining+' s' : '',weak.length ? 'Đèn ít dầu · '+weak.join(', ') : ''].filter(Boolean).join(' · ');
+  const arrow = byId('shade-alert');
+  arrow.hidden = !shadeWarning || now > shadeWarning.until;
+  if (!arrow.hidden) {
+    const angle = Math.atan2(shadeWarning.pos[0]-night.player.pos[0],shadeWarning.pos[2]-night.player.pos[2])-yaw;
+    arrow.textContent = ['↑','↗','→','↘','↓','↙','←','↖'][(Math.round(angle/(Math.PI/4))+16)%8]+' Bóng Mực xuất hiện';
+    arrow.style.left = (50+36*Math.sin(angle))+'%';
+    arrow.style.top = (50-36*Math.cos(angle))+'%';
+  }
   ui.clock.classList.toggle('danger', remaining <= 30);
   const windWarning = night.windEnabled && night.simTick % 1800 >= 1680;
   ui['wind-notice'].hidden = !windWarning && !night.wind.active;
@@ -225,8 +241,8 @@ function updateHud(now) {
   const nearby = night.nearbyLantern();
   ui.prompt.hidden = !nearby || mode !== 'playing';
   if (nearby) {
-    const message = nearby.lit ? `E — Châm dầu (${Math.floor(nearby.fuelUnits / 60)}/100)`
-      : `E — Nạp ánh sáng (${nearby.deposited}/${nearby.ever_lit ? tuning.relight_cost : tuning.lantern_cost})`;
+    const message = nearby.lit ? `${access.label('KeyE')} — Châm dầu (${Math.floor(nearby.fuelUnits / 60)}/100)`
+      : `${access.label('KeyE')} — Nạp ánh sáng (${nearby.deposited}/${nearby.ever_lit ? tuning.relight_cost : tuning.lantern_cost})`;
     if (ui.prompt.textContent !== message) ui.prompt.textContent = message;
   }
   renderMap();
@@ -358,16 +374,17 @@ function bindControls() {
   });
   window.addEventListener('keydown', (event) => {
     if (ui.settings.open) return;
-    if (event.code === 'Escape' || event.code === 'KeyP') {
+    const code = access.resolve(event.code);
+    if (code === 'Escape') {
       if (event.repeat) return;
       if (mode === 'paused') resume();
       else pause();
     }
-    if (mode !== 'playing' || !controls.has(event.code)) return;
+    if (mode !== 'playing' || !controls.has(code)) return;
     event.preventDefault();
-    press(event.code);
+    press(code);
   });
-  window.addEventListener('keyup', (event) => keys.delete(event.code));
+  window.addEventListener('keyup', (event) => keys.delete(access.resolve(event.code)));
   window.addEventListener('blur', () => {
     keys.clear();
     pending.clear();
@@ -406,6 +423,8 @@ try {
   scene.accessibleColors = settings.accessibleColors;
   document.body.classList.toggle('accessible', settings.accessibleColors);
   for (const lantern of night.lanterns) ui['lantern-pips'].append(document.createElement('i'));
+  access = bindAccess(storage, scene);
+  setScoreForm = initRanking();
   bindControls();
   ui.start.disabled = false;
   requestAnimationFrame(frame);

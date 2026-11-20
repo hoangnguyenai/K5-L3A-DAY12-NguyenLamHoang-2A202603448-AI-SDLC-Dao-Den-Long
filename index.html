@@ -24,6 +24,7 @@
       <p class="intro-copy">Cùng Mây qua ba hòn đảo, gom đom đóm và giữ đảo sáng đến bình minh.</p>
       <button type="button" class="primary" id="start" disabled>Bắt đầu chơi <span aria-hidden="true">→</span></button>
       <button type="button" class="plain" id="menu-settings">Cài đặt</button>
+      <button class="plain" id="open-board">Bảng xếp hạng</button>
       <p id="load-error" role="alert" hidden></p>
     </section>
 
@@ -50,6 +51,7 @@
       <div class="feedback" aria-live="polite"><span id="notice" hidden></span><span id="prompt" hidden></span></div>
       <div id="mote-bar" class="mote-bar" aria-label="Đom đóm đang mang"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div class="cooldowns"><span id="dash-status"></span><span id="pulse-status"></span></div>
+      <span id="shade-alert" role="status" hidden></span><span id="captions" role="status"></span>
       <span id="direction" class="direction" hidden></span>
       <span id="wind-notice" class="wind-notice" hidden></span>
     </section>
@@ -59,6 +61,7 @@
         <p class="eyebrow" id="overlay-tag"></p>
         <h2 id="overlay-title"></h2>
         <p id="overlay-description"></p>
+        <form id="score-form" hidden><label>Tên người chơi <input id="player-name" pattern="[A-Za-z0-9_]{3,12}" minlength="3" maxlength="12" required placeholder="Tên 3–12 ký tự" title="3–12 chữ cái A–Z, chữ số hoặc dấu gạch dưới"></label> <button id="save-score" class="plain">Lưu điểm</button><p id="save-status" role="status"></p></form>
         <button type="button" id="overlay-action" class="primary"></button>
         <div id="pause-options" class="pause-options" hidden>
           <button type="button" id="restart-night" class="plain">Chơi lại Đêm</button>
@@ -68,6 +71,7 @@
       </div>
     </section>
 
+    <dialog id="board" class="dialog panel"><h2>Bảng xếp hạng</h2><p id="board-status" role="status"></p><ol id="entries"></ol><form method="dialog"><button class="primary">Đóng</button></form></dialog>
     <dialog id="settings" class="dialog panel" aria-labelledby="settings-title">
       <h2 id="settings-title">Cài đặt</h2>
       <label class="setting" for="volume">Âm lượng <output id="volume-value"></output></label>
@@ -75,6 +79,9 @@
       <label class="setting" for="sensitivity">Độ nhạy chuột <output id="sensitivity-value"></output></label>
       <input id="sensitivity" type="range" min="0.25" max="2" step="0.05">
       <label class="setting"><input type="checkbox" id="accessibleColors"> Bảng màu dễ phân biệt</label>
+      <label class="setting">Giảm chuyển động <input type="checkbox" id="reduced"></label>
+      <label class="setting">Chữ lớn ×1.25 <input type="checkbox" id="large"></label>
+      <details><summary>Đổi phím điều khiển</summary><div id="bindings"></div><button class="plain" id="reset-keys">Khôi phục mặc định</button></details>
       <p id="settings-status" role="status"></p>
       <form method="dialog"><button class="primary" type="submit">Đóng</button></form>
     </dialog>

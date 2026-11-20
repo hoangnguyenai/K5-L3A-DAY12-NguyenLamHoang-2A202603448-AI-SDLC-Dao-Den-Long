@@ -7,9 +7,14 @@ import assert from 'node:assert/strict';
 
 // Chạy trình duyệt kiểm thử riêng cho bản web local. Không dùng profile người học.
 const root = fileURLToPath(new URL('../', import.meta.url));
-const proof = join(root, 'docs', 'phase-3', 'proof');
+const proof = join(root, 'docs', 'phase-4', 'proof');
 await mkdir(proof, { recursive: true });
 const profile = await mkdtemp(join(tmpdir(), 'lantern-browser-'));
+const server = spawn(process.execPath, ['scripts/serve.mjs'], { cwd:root, env:{...process.env,LANTERN_BOARD:join(profile,'board.json'),LANTERN_PORT:'0'}, windowsHide:true });
+const gameUrl = await new Promise((resolve,reject)=>{
+  server.once('error',reject); server.once('exit',code=>reject(Error('Server stopped '+code)));
+  server.stdout.on('data',chunk=>{const url=chunk.toString().match(/http:\/\/127\.0\.0\.1:\d+/);if(url)resolve(url[0]);});
+});
 const executable = process.env.LANTERN_CHROME ?? (process.platform === 'win32'
   ? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
   : process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
@@ -82,7 +87,7 @@ try {
   await command('Runtime.enable');
   await command('Page.enable');
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
-  await command('Page.navigate', { url: 'http://127.0.0.1:4173/' });
+  await command('Page.navigate', { url: gameUrl });
   await waitFor(`document.getElementById('start')?.disabled === false`);
   await screenshot('menu.png');
   await click('menu-settings');
@@ -93,8 +98,23 @@ try {
   assert.equal(await evaluate(`document.getElementById('volume').value`), '0.6');
   assert.equal(await evaluate(`document.getElementById('sensitivity').value`), '1.5');
   assert.equal(await evaluate(`document.getElementById('accessibleColors').checked`), true);
+  await evaluate(`document.getElementById('large').click();document.getElementById('reduced').click();
+    document.querySelector('#settings details').open=true;document.querySelector('#bindings button').click();
+    document.querySelector('#bindings button').dispatchEvent(new KeyboardEvent('keydown',{code:'KeyS',bubbles:true}));`);
+  assert.match(await evaluate(`document.getElementById('settings-status').textContent`),/Phím đã dùng/);
+  await evaluate(`document.querySelector('#bindings button').dispatchEvent(new KeyboardEvent('keydown',{code:'KeyI',bubbles:true}));`);
+  assert.equal(await evaluate(`document.querySelector('#bindings button').textContent`),'Tiến · I');
+  await command('Page.reload');
+  await waitFor(`document.getElementById('start')?.disabled === false`);
+  await click('menu-settings');
+  assert.equal(await evaluate(`document.querySelector('#bindings button').textContent`),'Tiến · I');
+  assert.equal(await evaluate(`getComputedStyle(document.documentElement).fontSize`),'22.5px');
+  await click('reset-keys');await click('large');await click('reduced');
   await screenshot('settings.png');
   await evaluate(`document.getElementById('settings').close()`);
+  await click('open-board');
+  await waitFor(`document.getElementById('board-status').textContent === 'Chưa có điểm được lưu.'`);
+  await evaluate(`document.getElementById('board').close()`);
   await click('start');
   assert.equal(await evaluate(`document.getElementById('night-intro').hidden`), false);
   await click('enter-night');
@@ -172,7 +192,12 @@ try {
   assert.ok(fps.fps >= 30, `Đêm 1 chỉ đạt ${fps.fps} FPS`);
   for (const measured of mapFps) assert.ok(measured.fps >= 30, `Preview Đêm ${measured.night} chỉ đạt ${measured.fps} FPS`);
   console.log(JSON.stringify(report));
+  if (process.argv.includes('--demo')) {
+    const { recordDemo } = await import('./record-demo.mjs');
+    await recordDemo({command,evaluate,click,waitFor,root,gameUrl});
+  }
 } finally {
   socket?.close();
   chrome.kill();
+  server.kill();
 }
