@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: input từng phần, xoay camera, chuẩn hóa đường chéo và snapshot đúng tick
+ok 1 - input từng phần, xoay camera, chuẩn hóa đường chéo và snapshot đúng tick
+  ---
+  duration_ms: 442.6643
+  type: 'test'
+  ...
+# Subtest: nhặt đúng bán kính ngang, tỏa sáng hất lùi, nạp và thắp đèn
+ok 2 - nhặt đúng bán kính ngang, tỏa sáng hất lùi, nạp và thắp đèn
+  ---
+  duration_ms: 591.1514
+  type: 'test'
+  ...
+# Subtest: giữ nút không lặp hành động, hồi chiêu và hết choáng đúng tick
+ok 3 - giữ nút không lặp hành động, hồi chiêu và hết choáng đúng tick
+  ---
+  duration_ms: 7.4593
+  type: 'test'
+  ...
+# Subtest: sức chứa, nạp một phần, vùng an toàn và scenario không tự cộng điểm
+ok 4 - sức chứa, nạp một phần, vùng an toàn và scenario không tự cộng điểm
+  ---
+  duration_ms: 1.7477
+  type: 'test'
+  ...
+# Subtest: thua khi cạn sinh lực hoặc tới bình minh, có khoảng bất tử giữa các cú chạm
+ok 5 - thua khi cạn sinh lực hoặc tới bình minh, có khoảng bất tử giữa các cú chạm
+  ---
+  duration_ms: 915.358
+  type: 'test'
+  ...
+# Subtest: màn mặc định chơi được tới thắng và cùng seed cho JSONL giống từng byte
+ok 6 - màn mặc định chơi được tới thắng và cùng seed cho JSONL giống từng byte
+  ---
+  duration_ms: 1317.3639
+  type: 'test'
+  ...
+# Subtest: ticks bằng 0 và input/scenario sai cấu trúc trả mã 2 qua stderr
+ok 7 - ticks bằng 0 và input/scenario sai cấu trúc trả mã 2 qua stderr
+  ---
+  duration_ms: 974.7924
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4358.5682
