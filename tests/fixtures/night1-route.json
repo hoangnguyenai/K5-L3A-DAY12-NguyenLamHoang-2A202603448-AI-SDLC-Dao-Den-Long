@@ -1,0 +1,18 @@
+{
+  "frames": [
+    {"tick": 0, "move": [0, 1], "cam_yaw_deg": 0},
+    {"tick": 225, "move": [0, 0], "interact": true},
+    {"tick": 226, "move": [0, -1], "interact": false},
+    {"tick": 451, "move": [0, 1], "cam_yaw_deg": 144},
+    {"tick": 676, "move": [0, 0], "interact": true},
+    {"tick": 677, "move": [0, -1], "interact": false},
+    {"tick": 902, "move": [0, 1], "cam_yaw_deg": 72},
+    {"tick": 1127, "move": [0, 0], "interact": true},
+    {"tick": 1128, "move": [0, -1], "interact": false},
+    {"tick": 1353, "move": [0, 1], "cam_yaw_deg": 288},
+    {"tick": 1578, "move": [0, 0], "interact": true},
+    {"tick": 1579, "move": [0, -1], "interact": false},
+    {"tick": 1804, "move": [0, 1], "cam_yaw_deg": 216},
+    {"tick": 2029, "move": [0, 0], "interact": true}
+  ]
+}
